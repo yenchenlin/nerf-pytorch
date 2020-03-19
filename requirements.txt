@@ -1,0 +1,6 @@
+torch>=1.4.0
+torchvision>=0.2.1
+imageio
+imageio-ffmpeg
+matplotlib
+configargparse
