@@ -1,6 +1,15 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
+
+# Misc
+# TODO: port these to pytorch
+"""
+img2mse = lambda x, y : tf.reduce_mean(tf.square(x - y))
+mse2psnr = lambda x : -10.*tf.log(x)/tf.log(10.)
+to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
+"""
 
 # Positional encoding (section 5.1)
 class Embedder:
@@ -55,135 +64,58 @@ def get_embedder(multires, i=0):
 
 
 # Model
-def create_nerf(args):
-    
-    embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
+class NeRF(nn.Module):
+    def __init__(self, D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips=[4], use_viewdirs=False):
+        """ 
+        """
+        super(NeRF, self).__init__()
+        self.skips = skips
+        
+        self.pts_linears = nn.ModuleList(
+            [nn.Linear(input_ch, W)] + [nn.Linear(W, W) if i not in self.skips else nn.Linear(W + input_ch, W) for i in range(D-1)])
+        
+        ### Implementation according to the official code release (https://github.com/bmild/nerf/blob/master/run_nerf_helpers.py#L104-L105)
+        self.views_linears = nn.ModuleList([nn.Linear(input_ch_views + W, W//2)])
 
-    input_ch_views=0
-    embeddirs_fn=None
-    if args.use_viewdirs:
-        embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed)
-    output_ch = 5 if args.N_importance > 0 else 4
-    skips = [4]
-    model = init_nerf_model(D=args.netdepth, W=args.netwidth, 
-                               input_ch=input_ch, output_ch=output_ch, skips=skips,
-                               input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
-    grad_vars = model.trainable_variables
-    models = {'model' : model}
-    
-            
-    model_fine=None
-    if args.N_importance > 0:
-        model_fine = init_nerf_model(D=args.netdepth_fine, W=args.netwidth_fine, 
-                                   input_ch=input_ch, output_ch=output_ch, skips=skips,
-                                   input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
-        grad_vars += model_fine.trainable_variables
-        models['model_fine'] = model_fine
+        ### Implementation according to the paper
+        # self.views_linears = nn.ModuleList(
+        #     [nn.Linear(input_ch_views + W, W//2)] + [nn.Linear(W//2, W//2) for i in range(D//2)])
         
-    
-    network_query_fn = lambda inputs, viewdirs, network_fn : run_network(inputs, viewdirs, network_fn,
-                                                                embed_fn=embed_fn, 
-                                                                embeddirs_fn=embeddirs_fn,
-                                                                netchunk=args.netchunk)
-        
-    render_kwargs_train = {
-        'network_query_fn' : network_query_fn,
-        'perturb' : args.perturb,
-        'N_importance' : args.N_importance,
-        'network_fine' : model_fine,
-#         'embed_fn' : embed_fn,
-        'N_samples' : args.N_samples,
-        'network_fn' : model,
-        'use_viewdirs' : args.use_viewdirs,
-#         'embeddirs_fn' : embeddirs_fn,
-        'white_bkgd' : args.white_bkgd,
-        'raw_noise_std' : args.raw_noise_std,
-    }
-    
-    # NDC only good for LLFF-style forward facing data
-    if args.dataset_type != 'llff' or args.no_ndc:
-        print('Not ndc!')
-        render_kwargs_train['ndc'] = False           
-        render_kwargs_train['lindisp'] = args.lindisp
-        
-        
-    render_kwargs_test = {k : render_kwargs_train[k] for k in render_kwargs_train}
-    render_kwargs_test['perturb'] = False
-    render_kwargs_test['raw_noise_std'] = 0.
-    
+        if use_viewdirs:
+            self.feature_linear = nn.Linear(W, W)
+            self.alpha_linear = nn.Linear(W, 1)
+            self.rgb_linear = nn.Linear(W//2, 3)
+        else:
+            self.output_linear = nn.Linear(W, output_ch)
 
-    start=0
-    basedir = args.basedir
-    expname = args.expname
-    
-    if args.ft_path is not None and args.ft_path!='None':
-        ckpts = [args.ft_path]
-    else:
-        ckpts = [os.path.join(basedir, expname, f) for f in sorted(os.listdir(os.path.join(basedir, expname))) if
-             ('model_' in f and 'fine' not in f and 'optimizer' not in f)]
-    print('Found ckpts', ckpts)
-    if len(ckpts) > 0 and not args.no_reload:
-        ft_weights = ckpts[-1]
-        print('Reloading from', ft_weights)
-        model.set_weights(np.load(ft_weights, allow_pickle=True))
-        start = int(ft_weights[-10:-4]) + 1
-        print('Resetting step to', start)
-        
-        if model_fine is not None:
-            ft_weights_fine = '{}_fine_{}'.format(ft_weights[:-11], ft_weights[-10:])
-            print('Reloading fine from', ft_weights_fine)
-            model_fine.set_weights(np.load(ft_weights_fine, allow_pickle=True))
-        
-        
-    return render_kwargs_train, render_kwargs_test, start, grad_vars, models
+    def forward(self, x):
+        input_pts, input_views = torch.split(x, 3, dim=-1)
+        h = input_pts
+        for i, l in enumerate(self.pts_linears):
+            h = self.pts_linears[i](h)
+            h = F.relu(h)
+            if i in self.skips:
+                h = torch.cat([inputs_pts, h], -1)
 
+        if use_viewdirs:
+            alpha = self.alpha_linear(h)
+            feature = self.feature_linear(h)
+            h = torch.cat([feature, input_views], -1)
+        
+            for i, l in enumerate(self.views_linears):
+                h = self.views_linears[i](h)
+                h = F.relu(h)
 
-def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips=[4], use_viewdirs=False):
-    
-    relu = tf.keras.layers.ReLU()    
-    dense = lambda W, act=relu : tf.keras.layers.Dense(W, activation=act)
-    
-    print('MODEL', input_ch, input_ch_views, type(input_ch), type(input_ch_views), use_viewdirs)
-    input_ch = int(input_ch)
-    input_ch_views = int(input_ch_views)
-    
-    inputs = tf.keras.Input(shape=(input_ch + input_ch_views)) 
-    inputs_pts, inputs_views = tf.split(inputs, [input_ch, input_ch_views], -1)
-    inputs_pts.set_shape([None, input_ch])
-    inputs_views.set_shape([None, input_ch_views])
-    
-    print(inputs.shape, inputs_pts.shape, inputs_views.shape)
-    outputs = inputs_pts
-    for i in range(D):
-        outputs = dense(W)(outputs)
-        if i in skips:
-            outputs = tf.concat([inputs_pts, outputs], -1)
-                        
-    if use_viewdirs:
-        alpha_out = dense(1, act=None)(outputs)
-        bottleneck = dense(256, act=None)(outputs)
-        inputs_viewdirs = tf.concat([bottleneck, inputs_views], -1)  # concat viewdirs
-        for i in range(D//2):
-            outputs = dense(W//2)(inputs_viewdirs)
-        outputs = dense(3, act=None)(outputs)
-        outputs = tf.concat([outputs, alpha_out], -1)
-    else:
-        outputs = dense(output_ch, act=None)(outputs)
-    
-    model = tf.keras.Model(inputs=inputs, outputs=outputs)
-    return model
+            rgb = self.rgb_linear(h)
+            outputs = torch.cat([rgb, alpha], -1)
+        else:
+            outputs = self.output_linear(h)
+
+        return outputs    
+
 
 """
 # Ray helpers
-
-def get_rays(H, W, focal, c2w):
-    i, j = tf.meshgrid(tf.range(W, dtype=tf.float32), tf.range(H, dtype=tf.float32), indexing='xy')
-    dirs = tf.stack([(i-W*.5)/focal, -(j-H*.5)/focal, -tf.ones_like(i)], -1)
-    rays_d = tf.reduce_sum(dirs[..., np.newaxis, :] * c2w[:3,:3], -1)
-    rays_o = tf.broadcast_to(c2w[:3,-1], tf.shape(rays_d))
-    return rays_o, rays_d
-
-
 def get_rays_np(H, W, focal, c2w):
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
     dirs = np.stack([(i-W*.5)/focal, -(j-H*.5)/focal, -np.ones_like(i)], -1)
@@ -213,33 +145,37 @@ def ndc_rays(H, W, focal, near, rays_o, rays_d):
     return rays_o, rays_d
 """
 
-    
+
 # Hierarchical sampling (section 5.2)
 def sample_pdf(bins, weights, N_samples, det=False):
 
     # Get pdf
     weights += 1e-5 # prevent nans
-    pdf = weights / tf.reduce_sum(weights, -1, keepdims=True)
-    cdf = tf.cumsum(pdf, -1)
-    cdf = tf.concat([tf.zeros_like(cdf[...,:1]), cdf], -1)
+    pdf = weights / torch.sum(weights, -1, keepdim=True)
+    cdf = torch.cumsum(pdf, -1)
+    cdf = torch.cat([torch.zeros_like(cdf[...,:1]), cdf], -1)
 
     # Take uniform samples
     if det:
-        u = tf.linspace(0., 1., N_samples)
-        u = tf.broadcast_to(u, list(cdf.shape[:-1]) + [N_samples])
+        u = torch.linspace(0., 1., steps=N_samples)
+        u = torch.expand(u, list(cdf.shape[:-1]) + [N_samples])
     else:
-        u = tf.random.uniform(list(cdf.shape[:-1]) + [N_samples])
+        u = torch.rand(list(cdf.shape[:-1]) + [N_samples])
 
     # Invert CDF
     inds = tf.searchsorted(cdf, u, side='right')
-    below = tf.maximum(0, inds-1)
-    above = tf.minimum(cdf.shape[-1]-1, inds)
-    inds_g = tf.stack([below, above], -1)
-    cdf_g = tf.gather(cdf, inds_g, axis=-1, batch_dims=len(inds_g.shape)-2)
-    bins_g = tf.gather(bins, inds_g, axis=-1, batch_dims=len(inds_g.shape)-2)
+    below = torch.max(0, inds-1)
+    above = torch.min(cdf.shape[-1]-1, inds)
+    inds_g = torch.stack([below, above], -1)
+    # cdf_g = tf.gather(cdf, inds_g, axis=-1, batch_dims=len(inds_g.shape)-2)
+    # bins_g = tf.gather(bins, inds_g, axis=-1, batch_dims=len(inds_g.shape)-2)
+
+    cdf_g = cdf[inds_g]
+    bins_g = bins[inds_g]
+    print(cdf_g.shape, bins_g.shape)
 
     denom = (cdf_g[...,1]-cdf_g[...,0])
-    denom = tf.where(denom<1e-5, tf.ones_like(denom), denom)
+    denom = torch.where(denom<1e-5, torch.ones_like(denom), denom)
     t = (u-cdf_g[...,0])/denom
     samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
 
