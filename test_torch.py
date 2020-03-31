@@ -26,7 +26,7 @@ def test_positional_encoding():
     
     assert np.allclose(y_torch, y_tf), "Positional encoding is wrong!"
 
-
+"""
 def test_hierarchical_sampling():
     from run_nerf_helpers_torch import sample_pdf as sample_pdf_torch
     from run_nerf_helpers import sample_pdf as sample_pdf_tf
@@ -38,7 +38,7 @@ def test_hierarchical_sampling():
     print(sample_pdf_tf(bins, weights, N_samples))
 
 
-"""
+
 def test_model_architecture():
     from run_nerf_helpers_torch import init_nerf_model as init_nerf_model_torch
     from run_nerf_helpers import init_nerf_model as init_nerf_model_tf
@@ -70,4 +70,4 @@ def test_load_blender_data():
     assert np.allclose(poses_torch, poses_tf)
     assert np.allclose(render_poses_torch.numpy(), render_poses_tf.numpy())
 
-# test_hierarchical_sampling()
+

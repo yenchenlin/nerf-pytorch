@@ -162,12 +162,16 @@ def sample_pdf(bins, weights, N_samples, det=False):
     cdf = tf.cumsum(pdf, -1)
     cdf = tf.concat([tf.zeros_like(cdf[...,:1]), cdf], -1)
 
+    print(f"CDF: {cdf}")
+
     # Take uniform samples
     if det:
         u = tf.linspace(0., 1., N_samples)
         u = tf.broadcast_to(u, list(cdf.shape[:-1]) + [N_samples])
     else:
         u = tf.random.uniform(list(cdf.shape[:-1]) + [N_samples])
+    u = tf.cast(u, tf.float64)
+    print(f"u: {u}")
 
     # Invert CDF
     inds = tf.searchsorted(cdf, u, side='right')
