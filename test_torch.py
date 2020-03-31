@@ -6,7 +6,7 @@ tf.compat.v1.enable_eager_execution()
 
 
 def test_positional_encoding():
-    from create_nerf_torch import get_embedder as get_embedder_torch
+    from run_nerf_helpers_torch import get_embedder as get_embedder_torch
     from run_nerf_helpers import get_embedder as get_embedder_tf
     
     multires = 10
@@ -28,7 +28,7 @@ def test_positional_encoding():
 
 
 def test_hierarchical_sampling():
-    from create_nerf_torch import sample_pdf as sample_pdf_torch
+    from run_nerf_helpers_torch import sample_pdf as sample_pdf_torch
     from run_nerf_helpers import sample_pdf as sample_pdf_tf
 
     bins = np.array([0., 1., 2., 4.])
@@ -40,7 +40,7 @@ def test_hierarchical_sampling():
 
 """
 def test_model_architecture():
-    from create_nerf_torch import init_nerf_model as init_nerf_model_torch
+    from run_nerf_helpers_torch import init_nerf_model as init_nerf_model_torch
     from run_nerf_helpers import init_nerf_model as init_nerf_model_tf
 """
 
