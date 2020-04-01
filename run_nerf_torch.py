@@ -6,7 +6,7 @@ import random
 import time
 import torch
 import torch.nn as nn
-import torch.nn.Functional as F
+import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
 
@@ -17,12 +17,30 @@ from load_deepvoxels import load_dv_data
 from load_blender_torch import load_blender_data
 
 
+# tested
 def batchify(fn, chunk):
     if chunk is None:
         return fn
     def ret(inputs):
         return torch.cat([fn(inputs[i:i+chunk]) for i in range(0, inputs.shape[0], chunk)], 0)
     return ret
+
+
+# tested
+def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
+    
+    inputs_flat = torch.reshape(inputs, [-1, inputs.shape[-1]])
+    embedded = embed_fn(inputs_flat)
+
+    if viewdirs is not None:
+        input_dirs = viewdirs[:,None].expand(inputs.shape)
+        input_dirs_flat = torch.reshape(input_dirs, [-1, input_dirs.shape[-1]])
+        embedded_dirs = embeddirs_fn(input_dirs_flat)
+        embedded = torch.cat([embedded, embedded_dirs], -1)
+        
+    outputs_flat = batchify(fn, netchunk)(embedded)
+    outputs = torch.reshape(outputs_flat, list(inputs.shape[:-1]) + [outputs_flat.shape[-1]])
+    return outputs
 
 
 def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
@@ -37,22 +55,6 @@ def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
             
     all_ret = {k : torch.cat(all_ret[k], 0) for k in all_ret}
     return all_ret
-
-
-def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
-    
-    inputs_flat = torch.reshape(inputs, [-1, inputs.shape[-1]])
-    embedded = embed_fn(inputs_flat)
-
-    if viewdirs is not None:
-        input_dirs = torch.expand(viewdirs[:,None], inputs.shape)
-        input_dirs_flat = torch.reshape(input_dirs, [-1, input_dirs.shape[-1]])
-        embedded_dirs = embeddirs_fn(input_dirs_flat)
-        embedded = torch.cat([embedded, embedded_dirs], -1)
-        
-    outputs_flat = batchify(fn, netchunk)(embedded)
-    outputs = torch.reshape(outputs_flat, list(inputs.shape[:-1]) + [outputs_flat.shape[-1]])
-    return outputs
 
 
 def render(H, W, focal, chunk=1024*32, rays=None, c2w=None, ndc=True, 
@@ -79,7 +81,7 @@ def render(H, W, focal, chunk=1024*32, rays=None, c2w=None, ndc=True,
     sh = rays_d.shape # [..., 3]
     if ndc:
         # for forward facing scenes
-        rays_o, rays_d = ndc_rays(H, W, focal, tf.cast(1., tf.float32), rays_o, rays_d)
+        rays_o, rays_d = ndc_rays(H, W, focal, 1., rays_o, rays_d)
     
     # Create ray batch
     rays_o = torch.reshape(rays_o, [-1,3]).float()
@@ -214,7 +216,34 @@ def create_nerf(args):
     return render_kwargs_train, render_kwargs_test, start, grad_vars, models
 
 
-# --- progress bar
+def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False):
+    """ A helper function for `render_rays`.
+    """
+    raw2alpha = lambda raw, dists, act_fn=F.relu: 1.-torch.exp(-act_fn(raw)*dists)
+    
+    dists = z_vals[...,1:] - z_vals[...,:-1]
+    dists = torch.cat([dists, torch.Tensor([1e10]).expand(dists[...,:1].shape)], -1)  # [N_rays, N_samples]
+    
+    dists = dists * torch.norm(rays_d[...,None,:], dim=-1)
+
+    rgb = torch.sigmoid(raw[...,:3])  # [N_rays, N_samples, 3]
+    noise = 0.
+    if raw_noise_std > 0.:
+        noise = torch.randn(raw[...,3].shape) * raw_noise_std
+    alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
+    # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
+    weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
+    rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
+    
+    depth_map = torch.sum(weights * z_vals, -1) 
+    disp_map = 1./torch.max(1e-10 * torch.ones_like(depth_map), depth_map / torch.sum(weights, -1))
+    acc_map = torch.sum(weights, -1)
+    
+    if white_bkgd:
+        rgb_map = rgb_map + (1.-acc_map[...,None])
+    
+    return rgb_map, disp_map, acc_map, weights, depth_map
+
 
 def render_rays(ray_batch, 
                 network_fn, 
@@ -227,35 +256,7 @@ def render_rays(ray_batch,
                 network_fine=None,
                 white_bkgd=False,
                 raw_noise_std=0.,
-                verbose=False):
-
-    def raw2outputs(raw, z_vals, rays_d):
-        raw2alpha = lambda raw, dists, act_fn=F.relu: 1.-torch.exp(-act_fn(raw)*dists)
-        
-        dists = z_vals[...,1:] - z_vals[...,:-1]
-        dists = torch.concat([dists, tf.broadcast_to([1e10], dists[...,:1].shape)], -1) # [N_rays, N_samples]
-        
-        dists = dists * torch.norm(rays_d[...,None,:], dim=-1)
-
-        rgb = tf.math.sigmoid(raw[...,:3])  # [N_rays, N_samples, 3]
-        noise = 0.
-        if raw_noise_std > 0.:
-            noise = tf.random.normal(raw[...,3].shape) * raw_noise_std
-        alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
-        weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
-        rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
-        
-        depth_map = torch.sum(weights * z_vals, -1) 
-        disp_map = 1./torch.sum(1e-10, depth_map / torch.sum(weights, -1))
-        acc_map = torch.sum(weights, -1)
-        
-        if white_bkgd:
-            rgb_map = rgb_map + (1.-acc_map[...,None])
-        
-        return rgb_map, disp_map, acc_map, weights, depth_map
-    
-    
-    
+                verbose=False):    
     ###############################
     
     
@@ -271,7 +272,7 @@ def render_rays(ray_batch,
     else:
         z_vals = 1./(1./near * (1.-t_vals) + 1./far * (t_vals))
         
-    z_vals = tf.broadcast_to(z_vals, [N_rays, N_samples])
+    z_vals = z_vals.expand([N_rays, N_samples])
         
     if perturb > 0.:
         # get intervals between samples     
@@ -279,7 +280,7 @@ def render_rays(ray_batch,
         upper = torch.cat([mids, z_vals[...,-1:]], -1)
         lower = torch.cat([z_vals[...,:1], mids], -1)
         # stratified samples in those intervals
-        t_rand = tf.random.uniform(z_vals.shape)
+        t_rand = torch.rand(z_vals.shape)
         z_vals = lower + (upper - lower) * t_rand
         
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
@@ -287,7 +288,7 @@ def render_rays(ray_batch,
         
 #     raw = run_network(pts)
     raw = network_query_fn(pts, viewdirs, network_fn)
-    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d)
+    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd)
     
     if N_importance > 0:
         
@@ -295,9 +296,9 @@ def render_rays(ray_batch,
         
         z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
         z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.))
-        z_samples = tf.stop_gradient(z_samples)
+        z_samples = z_samples.detach()
         
-        z_vals = tf.sort(tf.concat([z_vals, z_samples], -1), -1)
+        z_vals = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
         pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
         
         run_fn = network_fn if network_fine is None else network_fine
@@ -313,15 +314,13 @@ def render_rays(ray_batch,
         ret['rgb0'] = rgb_map_0
         ret['disp0'] = disp_map_0
         ret['acc0'] = acc_map_0
-        ret['z_std'] = tf.math.reduce_std(z_samples, -1) # [N_rays]
+        ret['z_std'] = torch.std(z_samples, dim=-1, unbiased=False)  # [N_rays]
         
     for k in ret:
-        tf.debugging.check_numerics(ret[k], 'output {}'.format(k))
+        if torch.isnan(ret[k]).any() or torch.isinf(ret[k]).any():
+            print(f"Numerical Error: output {k}: {ret[k]}")
         
     return ret
-
-
-
 
 
 def config_parser():
@@ -340,7 +339,7 @@ def config_parser():
     parser.add_argument("--netwidth_fine", type=int, default=256, help='channels per layer in fine network')
     parser.add_argument("--N_rand", type=int, default=32*32*4, help='batch size (number of random rays per gradient step)')
     parser.add_argument("--lrate", type=float, default=5e-4, help='learning rate')
-    parser.add_argument("--lrate_decay", type=int, default=250, help='exponential learning rate decay (in 1000s)')
+    parser.add_argument("--lrate_decay", type=int, default=250, help='exponential learning rate decay (in 1000 steps)')
     parser.add_argument("--chunk", type=int, default=1024*32, help='number of rays processed in parallel, decrease if running out of memory')
     parser.add_argument("--netchunk", type=int, default=1024*64, help='number of pts sent through network in parallel, decrease if running out of memory')
     parser.add_argument("--no_batching", action='store_true', help='only take random rays from 1 image at a time') 
@@ -419,8 +418,8 @@ def train():
         
         print('DEFINING BOUNDS')
         if args.no_ndc:
-            near = tf.reduce_min(bds) * .9
-            far = tf.reduce_max(bds) * 1.
+            near = torch.min(bds) * .9
+            far = torch.max(bds) * 1.
         else:
             near = 0.
             far = 1.
@@ -487,8 +486,8 @@ def train():
     render_kwargs_train, render_kwargs_test, start, grad_vars, models = create_nerf(args)
     
     bds_dict = {
-        'near' : tf.cast(near, tf.float32),
-        'far' : tf.cast(far, tf.float32),
+        'near' : near.float(),
+        'far' : far.float(),
     }
     render_kwargs_train.update(bds_dict)
     render_kwargs_test.update(bds_dict)
@@ -517,10 +516,12 @@ def train():
         
     # Create optimizer
     lrate = args.lrate
+    optimizer = torch.optim.Adam(params=grad_vars, lr=lrate, betas=(0.9, 0.999))
+    
     if args.lrate_decay > 0:
-        lrate = tf.keras.optimizers.schedules.ExponentialDecay(lrate,
-            decay_steps=args.lrate_decay * 1000, decay_rate=0.1)
-    optimizer = tf.keras.optimizers.Adam(lrate)
+        decay_rate = 0.1
+        lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decay_rate)
+        # TODO: remember to step it every args.lrate_decay * 1000 steps
     models['optimizer'] = optimizer
     
     global_step = tf.compat.v1.train.get_or_create_global_step()
@@ -565,7 +566,7 @@ def train():
         if use_batching:
             # Random over all images
             batch = rays_rgb[i_batch:i_batch+N_rand] # [B, 2+1, 3*?]
-            batch = tf.transpose(batch, [1,0,2])
+            batch = torch.transpose(batch, [1,0,2])
             batch_rays, target_s = batch[:2], batch[2]
 
             i_batch += N_rand
@@ -580,15 +581,15 @@ def train():
             pose = poses[img_i, :3,:4]
             
             if N_rand is not None:
-                rays_o, rays_d = get_rays(H, W, focal, pose)
-                coords = tf.stack(tf.meshgrid(tf.range(H), tf.range(W), indexing='ij'), -1)
-                coords = tf.reshape(coords, [-1,2])
-                select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)
-                select_inds = tf.gather_nd(coords, select_inds[:,tf.newaxis])
-                rays_o = tf.gather_nd(rays_o, select_inds)
-                rays_d = tf.gather_nd(rays_d, select_inds)
-                batch_rays = tf.stack([rays_o, rays_d], 0)
-                target_s = tf.gather_nd(target, select_inds)
+                rays_o, rays_d = get_rays(H, W, focal, pose)  # (H, W, 3), (H, W, 3)
+                coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
+                coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
+                select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
+                select_coords = coords[select_inds].long()  # (N_rand, 2)
+                rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
+                rays_d = rays_d[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
+                batch_rays_torch = torch.stack([rays_o, rays_d], 0)
+                target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
         
         
         #####  Core optimization loop  #####
@@ -618,7 +619,7 @@ def train():
         
         
         # Rest is logging
-
+        """
         def save_weights(net, prefix, i): 
             path = os.path.join(basedir, expname, '{}_{:06d}.npy'.format(prefix, i))
             np.save(path, net.get_weights())
@@ -693,7 +694,7 @@ def train():
                         tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
                         tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis,...,tf.newaxis])
                         tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis,...,tf.newaxis])
-                        
+        """        
                     
 
         global_step.assign_add(1)

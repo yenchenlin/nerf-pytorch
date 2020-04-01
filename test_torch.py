@@ -54,14 +54,92 @@ def test_hierarchical_sampling():
     N_samples = 3
 
     print(sample_pdf_tf(bins, weights, N_samples))
-
-
-
-def test_model_architecture():
-    from run_nerf_helpers_torch import init_nerf_model as init_nerf_model_torch
-    from run_nerf_helpers import init_nerf_model as init_nerf_model_tf
 """
 
+
+def test_model_forward_backward():
+    # Only run this test if CUDA is available
+    assert torch.cuda.is_available()
+    
+    # Hyperparams
+    use_viewdirs = True
+    multires = 10
+    multires_views = 4
+    i_embed = 0
+    N_importance = 64
+
+    # Prepare data
+    inputs = np.random.rand(10, 5, 3)  # (batch_size, N_importance, xyz)
+    viewdirs = np.random.rand(10, 3)   # (batch_size, view_dir)
+
+    inputs_tf = tf.cast(inputs, tf.float32)
+    viewdirs_tf = tf.cast(viewdirs, tf.float32)
+
+    inputs_torch = torch.Tensor(inputs)
+    viewdirs_torch = torch.Tensor(viewdirs)
+
+    ###################################
+
+    # tf
+    from run_nerf_helpers import init_nerf_model, get_embedder
+    from run_nerf import run_network
+
+    # Init
+    embed_fn, input_ch = get_embedder(multires, i_embed)
+    input_ch_views = 0
+    embeddirs_fn = None
+    if use_viewdirs:
+        embeddirs_fn, input_ch_views = get_embedder(multires_views, i_embed)
+    output_ch = 5 if N_importance > 0 else 4
+    skips = [4]
+
+    model_tf = init_nerf_model(input_ch=input_ch, output_ch=output_ch, skips=skips,
+                               input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
+    weights = model_tf.get_weights()
+
+    with tf.GradientTape() as tape:
+        # Forward pass
+        outputs_tf = run_network(inputs_tf, viewdirs_tf, model_tf, embed_fn, embeddirs_fn, netchunk=1024*64)
+        grad_vars = model_tf.trainable_variables
+        loss_tf = tf.reduce_mean(tf.square(tf.zeros_like(outputs_tf) - outputs_tf))
+        
+        # Backward pass
+        grads_tf = tape.gradient(loss_tf, grad_vars)  # same size as weights
+
+    ###################################
+
+    # torch
+    from run_nerf_helpers_torch import NeRF
+    from run_nerf_helpers_torch import get_embedder as get_embedder_torch
+    from run_nerf_torch import run_network as run_network_torch
+
+    # Init
+    embed_fn, input_ch = get_embedder_torch(multires, i_embed)
+    input_ch_views = 0
+    embeddirs_fn = None
+    if use_viewdirs:
+        embeddirs_fn, input_ch_views = get_embedder_torch(multires_views, i_embed)
+    output_ch = 5 if N_importance > 0 else 4
+    skips = [4] 
+
+    model_torch = NeRF(input_ch=input_ch, output_ch=output_ch, skips=skips,
+                       input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
+    model_torch.load_weights_from_keras(weights)
+
+    # Forward pass
+    outputs_torch = run_network_torch(inputs_torch, viewdirs_torch, model_torch, embed_fn, embeddirs_fn, netchunk=1024*64)
+    
+    # Backward pass
+    loss_torch = torch.mean((torch.zeros_like(outputs_torch) - outputs_torch) ** 2)
+    loss_torch.backward()
+    
+    ###################################
+
+    # Check outputs are the same
+    assert np.allclose(outputs_tf.numpy(), outputs_torch.detach().numpy(), atol=1e-6)
+    # Check first layer's gradients are the same
+    assert np.allclose(np.transpose(grads_tf[0].numpy()), model_torch.pts_linears[0].weight.grad.numpy(), atol=1e-6)  
+    
 
 def test_load_blender_data():
     from load_blender_torch import load_blender_data as load_blender_data_torch
@@ -87,3 +165,72 @@ def test_load_blender_data():
     assert np.allclose(images_torch, images_tf)
     assert np.allclose(poses_torch, poses_tf)
     assert np.allclose(render_poses_torch.numpy(), render_poses_tf.numpy())
+
+
+def test_raw2outputs():
+    raw_noise_std = 0
+    white_bkgd = True
+
+    raw = np.random.rand(10, 5, 4)
+    z_vals = np.random.rand(10, 5)
+    rays_d = np.random.rand(10, 3)
+
+    raw_tf = tf.cast(raw, tf.float32)
+    z_vals_tf = tf.cast(z_vals, tf.float32)
+    rays_d_tf = tf.cast(rays_d, tf.float32)
+
+    raw_torch = torch.Tensor(raw)
+    z_vals_torch = torch.Tensor(z_vals)
+    rays_d_torch = torch.Tensor(rays_d)
+
+    from run_nerf_torch import raw2outputs as raw2outputs_torch
+    # Contents copied from run_nerf.py
+    def raw2outputs_tf(raw, z_vals, rays_d):
+        raw2alpha = lambda raw, dists, act_fn=tf.nn.relu: 1.-tf.exp(-act_fn(raw)*dists)
+        
+        dists = z_vals[...,1:] - z_vals[...,:-1]
+        dists = tf.concat([dists, tf.broadcast_to([1e10], dists[...,:1].shape)], -1) # [N_rays, N_samples]
+        
+        dists = dists * tf.linalg.norm(rays_d[...,None,:], axis=-1)
+
+        rgb = tf.math.sigmoid(raw[...,:3])  # [N_rays, N_samples, 3]
+        noise = 0.
+        if raw_noise_std > 0.:
+            noise = tf.random.normal(raw[...,3].shape) * raw_noise_std
+        alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
+        weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
+        rgb_map = tf.reduce_sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
+        
+        depth_map = tf.reduce_sum(weights * z_vals, -1) 
+        disp_map = 1./tf.maximum(1e-10, depth_map / tf.reduce_sum(weights, -1))
+        acc_map = tf.reduce_sum(weights, -1)
+        
+        if white_bkgd:
+            rgb_map = rgb_map + (1.-acc_map[...,None])
+        
+        return rgb_map, disp_map, acc_map, weights, depth_map
+    
+    rgb_map_tf, disp_map_tf, acc_map_tf, weights_tf, depth_map_tf = raw2outputs_tf(raw_tf, z_vals_tf, rays_d_tf)
+    rgb_map_torch, disp_map_torch, acc_map_torch, weights_torch, depth_map_torch = raw2outputs_torch(raw_torch, z_vals_torch, rays_d_torch, raw_noise_std, white_bkgd)
+    
+    assert np.allclose(rgb_map_tf.numpy(), rgb_map_torch.numpy())
+    assert np.allclose(disp_map_tf.numpy(), disp_map_torch.numpy())
+    assert np.allclose(acc_map_tf.numpy(), acc_map_torch.numpy())
+    assert np.allclose(weights_tf.numpy(), weights_torch.numpy())
+    assert np.allclose(depth_map_tf.numpy(), depth_map_torch.numpy())
+
+        
+"""
+def test_render():
+    from run_nerf_helpers_torch import get_rays, get_rays_np
+    from run_nerf_torch import render
+    H, W, focal = int(400 / 40), int(400 / 40), 555.555 / 40
+    hwf = [H, W, focal]
+    pose = np.array([
+        [-0.9305, 0.1170, -0.3469, -1.3986],
+        [-0.3661, -0.2975, 0.8817, 3.554],
+        [0, 0.9475, 0.3197, 1.288]
+    ])
+
+    render(H, W, focal, chunk=1024, c2w=pose[:3,:4], **render_kwargs)
+"""
