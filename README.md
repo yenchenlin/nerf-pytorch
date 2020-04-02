@@ -1,10 +1,20 @@
-## Setup
+# NeRF-pytorch
 
-- `pip install ipdb`
+## Setup
+- `pip install ipdb configargparse imageio matplotlib`
+- `pip install torch`
 - Install [torchsearchsorted](https://github.com/aliutkus/torchsearchsorted)
 
+## Run
+To optimize a low-res Fern NeRF:
+```
+python run_nerf_torch.py --config config_fern.txt
+```
+
 ## Test
-`py.test`
+```
+py.test
+```
 
 ---
 
@@ -34,7 +44,7 @@ Python 3 dependencies:
 * matplotlib
 * numpy
 * imageio
-*  configargparse
+* configargparse
 
 The LLFF data loader requires ImageMagick.
 
