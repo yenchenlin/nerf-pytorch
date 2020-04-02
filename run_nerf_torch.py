@@ -216,7 +216,7 @@ def create_nerf(args):
     return render_kwargs_train, render_kwargs_test, start, grad_vars, models
 
 
-def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False):
+def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=False, noise_tf=None):
     """ A helper function for `render_rays`.
     """
     raw2alpha = lambda raw, dists, act_fn=F.relu: 1.-torch.exp(-act_fn(raw)*dists)
@@ -230,6 +230,12 @@ def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False):
     noise = 0.
     if raw_noise_std > 0.:
         noise = torch.randn(raw[...,3].shape) * raw_noise_std
+        
+        # Overwrite randomly sampled data if pytest
+        if pytest:
+            assert noise_tf is not None
+            noise = noise_tf
+
     alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
     # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
     weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
@@ -256,10 +262,11 @@ def render_rays(ray_batch,
                 network_fine=None,
                 white_bkgd=False,
                 raw_noise_std=0.,
-                verbose=False):    
-    ###############################
-    
-    
+                verbose=False,
+                pytest=False,
+                t_rand_tf=None,
+                z_samples_tf=None,
+                noise_tf=None):        
     N_rays = ray_batch.shape[0]
     rays_o, rays_d = ray_batch[:,0:3], ray_batch[:,3:6] # [N_rays, 3] each
     viewdirs = ray_batch[:,-3:] if ray_batch.shape[-1] > 8 else None
@@ -281,6 +288,12 @@ def render_rays(ray_batch,
         lower = torch.cat([z_vals[...,:1], mids], -1)
         # stratified samples in those intervals
         t_rand = torch.rand(z_vals.shape)
+        
+        # Overwrite randomly sampled data if in pytest mode 
+        if pytest:
+            assert t_rand_tf is not None
+            t_rand = t_rand_tf
+        
         z_vals = lower + (upper - lower) * t_rand
         
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
@@ -293,19 +306,30 @@ def render_rays(ray_batch,
     if N_importance > 0:
         
         rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
-        
+
         z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
         z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.))
         z_samples = z_samples.detach()
+
+        # Overwrite randomly sampled data if in pytest mode 
+        if pytest:
+            assert z_samples_tf is not None
+            z_samples = z_samples_tf
         
-        z_vals = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
+        z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
         pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
         
         run_fn = network_fn if network_fine is None else network_fine
 #         raw = run_network(pts, fn=run_fn)
         raw = network_query_fn(pts, viewdirs, run_fn)
-        rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d)
         
+        # Overwrite randomly sampled data if in pytest mode 
+        if not pytest:
+            rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd)
+        else:
+            assert noise_tf is not None
+            rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd, 
+                                                                         pytest=True, noise_tf=noise_tf)
         
     ret = {'rgb_map' : rgb_map, 'disp_map' : disp_map, 'acc_map' : acc_map}
     if retraw:

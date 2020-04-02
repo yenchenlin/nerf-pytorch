@@ -44,17 +44,29 @@ def test_get_rays():
     assert np.allclose(rays_d_np, rays_d_torch.numpy())
 
 
-"""
-def test_hierarchical_sampling():
+def test_sample_pdf():
     from run_nerf_helpers_torch import sample_pdf as sample_pdf_torch
     from run_nerf_helpers import sample_pdf as sample_pdf_tf
+    
+    N_samples = 5
+    bins = np.array([
+        [0., 1., 2., 4.],
+        [2., 4., 6., 8.]
+    ])
+    weights = np.array([
+        [1.0, 1.0, 1.0],
+        [0.5, 1.0, 0.5]
+    ])
 
-    bins = np.array([0., 1., 2., 4.])
-    weights = np.array([1.0, 1.0, 1.0])
-    N_samples = 3
+    bins_tf = tf.cast(bins, tf.float32)
+    weights_tf = tf.cast(weights, tf.float32)
+    bins_torch = torch.Tensor(bins)
+    weights_torch = torch.Tensor(weights)
+    
+    samples_tf, u_tf = sample_pdf_tf(bins_tf, weights_tf, N_samples, pytest=True)
+    samples_torch = sample_pdf_torch(bins_torch, weights_torch, N_samples, pytest=True, u_tf=torch.Tensor(u_tf))
 
-    print(sample_pdf_tf(bins, weights, N_samples))
-"""
+    assert np.allclose(samples_tf.numpy(), samples_torch.numpy())
 
 
 def test_model_forward_backward():
@@ -169,7 +181,7 @@ def test_load_blender_data():
 
 def test_raw2outputs():
     raw_noise_std = 0
-    white_bkgd = True
+    white_bkgd = False
 
     raw = np.random.rand(10, 5, 4)
     z_vals = np.random.rand(10, 5)
@@ -184,7 +196,7 @@ def test_raw2outputs():
     rays_d_torch = torch.Tensor(rays_d)
 
     from run_nerf_torch import raw2outputs as raw2outputs_torch
-    # Contents copied from run_nerf.py
+    # Function copied from run_nerf.py
     def raw2outputs_tf(raw, z_vals, rays_d):
         raw2alpha = lambda raw, dists, act_fn=tf.nn.relu: 1.-tf.exp(-act_fn(raw)*dists)
         
@@ -219,7 +231,120 @@ def test_raw2outputs():
     assert np.allclose(weights_tf.numpy(), weights_torch.numpy())
     assert np.allclose(depth_map_tf.numpy(), depth_map_torch.numpy())
 
-        
+
+def test_render_rays():
+    # Only run this test if CUDA is available
+    assert torch.cuda.is_available()
+    
+    # Hyperparams
+    use_viewdirs = True
+    multires = 10
+    multires_views = 4
+    i_embed = 0
+    N_importance = 64
+    output_ch = 5 if N_importance > 0 else 4
+    skips = [4]
+
+    # Prepare data
+    ray_batch = np.random.rand(10, 11)  # (batch, dim)
+    ray_batch_tf = tf.cast(ray_batch, tf.float32)
+    ray_batch_torch = torch.Tensor(ray_batch)
+
+    ###################################
+
+    # tf
+    from run_nerf_helpers import init_nerf_model
+    from run_nerf_helpers import get_embedder as get_embedder_tf
+    from run_nerf import run_network as run_network_tf
+    from run_nerf import render_rays as render_rays_tf
+
+    # Init
+    embed_fn, input_ch = get_embedder_tf(multires, i_embed)
+    input_ch_views = 0
+    embeddirs_fn = None
+    if use_viewdirs:
+        embeddirs_fn, input_ch_views = get_embedder_tf(multires_views, i_embed)
+
+    model_coarse_tf = init_nerf_model(input_ch=input_ch, output_ch=output_ch, skips=skips,
+                                      input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
+    model_fine_tf = init_nerf_model(input_ch=input_ch, output_ch=output_ch, skips=skips,
+                                    input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
+    network_query_fn_tf = lambda inputs, viewdirs, network_fn : run_network_tf(inputs, viewdirs, network_fn,
+                                                                embed_fn=embed_fn, 
+                                                                embeddirs_fn=embeddirs_fn,
+                                                                netchunk=1024*64)
+
+    kwargs = {'verbose': True, 
+              'retraw': True, 
+              'network_query_fn': network_query_fn_tf, 
+              'perturb': 1, 
+              'N_importance': 64, 
+              'network_fine': model_fine_tf, 
+              'N_samples': 64, 
+              'network_fn': model_coarse_tf, 
+              'white_bkgd': False, 
+              'raw_noise_std': 1.0,
+              'pytest': True}
+
+    # Run    
+    ret_tf = render_rays_tf(ray_batch_tf, **kwargs)
+
+    ###################################
+
+    # torch
+    from run_nerf_helpers_torch import NeRF
+    from run_nerf_helpers_torch import get_embedder as get_embedder_torch
+    from run_nerf_torch import run_network as run_network_torch
+    from run_nerf_torch import render_rays as render_rays_torch
+
+    # Init
+    embed_fn, input_ch = get_embedder_torch(multires, i_embed)
+    input_ch_views = 0
+    embeddirs_fn = None
+    if use_viewdirs:
+        embeddirs_fn, input_ch_views = get_embedder_torch(multires_views, i_embed)
+
+    model_coarse_torch = NeRF(input_ch=input_ch, output_ch=output_ch, skips=skips,
+                              input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
+    model_coarse_torch.load_weights_from_keras(model_coarse_tf.get_weights())
+    
+    model_fine_torch = NeRF(input_ch=input_ch, output_ch=output_ch, skips=skips,
+                            input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
+    model_fine_torch.load_weights_from_keras(model_fine_tf.get_weights())
+
+    network_query_fn_torch = lambda inputs, viewdirs, network_fn : run_network_torch(inputs, viewdirs, network_fn,
+                                                                embed_fn=embed_fn, 
+                                                                embeddirs_fn=embeddirs_fn,
+                                                                netchunk=1024*64)
+
+    kwargs = {'verbose': True, 
+              'retraw': True, 
+              'network_query_fn': network_query_fn_torch, 
+              'perturb': 1, 
+              'N_importance': 64, 
+              'network_fine': model_fine_torch, 
+              'N_samples': 64, 
+              'network_fn': model_coarse_torch, 
+              'white_bkgd': False, 
+              'raw_noise_std': 1.0,
+              'pytest': True,
+              't_rand_tf': torch.Tensor(ret_tf['t_rand']),
+              'z_samples_tf': torch.Tensor(ret_tf['z_samples']),
+              'noise_tf': torch.Tensor(ret_tf['noise'])}
+
+    # Run    
+    ret_torch = render_rays_torch(ray_batch_torch, **kwargs)
+
+    ###################################
+    keys = ['rgb_map', 'disp_map', 'acc_map', 'raw']
+    for key in keys:
+        if key == 'raw':
+            assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy(), atol=1e-6)
+        else:
+            assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy())
+    
+test_render_rays()
+
 """
 def test_render():
     from run_nerf_helpers_torch import get_rays, get_rays_np

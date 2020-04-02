@@ -60,7 +60,8 @@ def render_rays(ray_batch,
                 white_bkgd=False,
                 raw_noise_std=0.,
 #                 netchunk=1024*64,
-                verbose=False):
+                verbose=False,
+                pytest=False):
     
 #     def batchify(fn, chunk=netchunk):
 #         if chunk is None:
@@ -86,7 +87,7 @@ def render_rays(ray_batch,
 #         return outputs
         
         
-    def raw2outputs(raw, z_vals, rays_d):
+    def raw2outputs(raw, z_vals, rays_d, pytest=False):
         raw2alpha = lambda raw, dists, act_fn=tf.nn.relu: 1.-tf.exp(-act_fn(raw)*dists)
         
         dists = z_vals[...,1:] - z_vals[...,:-1]
@@ -109,6 +110,10 @@ def render_rays(ray_batch,
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[...,None])
         
+        # Added for testing
+        if pytest:
+            return rgb_map, disp_map, acc_map, weights, depth_map, noise
+
         return rgb_map, disp_map, acc_map, weights, depth_map
     
     
@@ -160,8 +165,10 @@ def render_rays(ray_batch,
         run_fn = network_fn if network_fine is None else network_fine
 #         raw = run_network(pts, fn=run_fn)
         raw = network_query_fn(pts, viewdirs, run_fn)
-        rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d)
-        
+        if not pytest:
+            rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d)
+        else:
+            rgb_map, disp_map, acc_map, weights, depth_map, noise = raw2outputs(raw, z_vals, rays_d, pytest=True)
         
     ret = {'rgb_map' : rgb_map, 'disp_map' : disp_map, 'acc_map' : acc_map}
     if retraw:
@@ -172,6 +179,15 @@ def render_rays(ray_batch,
         ret['acc0'] = acc_map_0
         ret['z_std'] = tf.math.reduce_std(z_samples, -1) # [N_rays]
         
+    
+    # Added for pytest
+    if pytest:
+        if perturb > 0.:
+            ret['t_rand'] = t_rand.numpy()
+        if N_importance > 0:
+            ret['z_samples'] = z_samples.numpy()
+            ret['noise'] = noise.numpy()
+
     for k in ret:
         tf.debugging.check_numerics(ret[k], 'output {}'.format(k))
         
