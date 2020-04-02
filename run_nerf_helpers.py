@@ -154,8 +154,7 @@ def ndc_rays(H, W, focal, near, rays_o, rays_d):
     
 # Hierarchical sampling helper    
 
-def sample_pdf(bins, weights, N_samples, det=False):
-
+def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
     # Get pdf
     weights += 1e-5 # prevent nans
     pdf = weights / tf.reduce_sum(weights, -1, keepdims=True)
@@ -174,6 +173,7 @@ def sample_pdf(bins, weights, N_samples, det=False):
     below = tf.maximum(0, inds-1)
     above = tf.minimum(cdf.shape[-1]-1, inds)
     inds_g = tf.stack([below, above], -1)
+
     cdf_g = tf.gather(cdf, inds_g, axis=-1, batch_dims=len(inds_g.shape)-2)
     bins_g = tf.gather(bins, inds_g, axis=-1, batch_dims=len(inds_g.shape)-2)
 
@@ -182,4 +182,7 @@ def sample_pdf(bins, weights, N_samples, det=False):
     t = (u-cdf_g[...,0])/denom
     samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
 
-    return samples
+    if not pytest:
+        return samples
+    else:
+        return samples, u.numpy()
