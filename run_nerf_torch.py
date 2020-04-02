@@ -18,7 +18,6 @@ from load_blender_torch import load_blender_data
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 
 def batchify(fn, chunk):
@@ -725,4 +724,5 @@ def train():
 
     
 if __name__=='__main__':
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
     train()
