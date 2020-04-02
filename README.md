@@ -1,3 +1,7 @@
+## Setup
+
+- `pip install ipdb`
+- Install [torchsearchsorted](https://github.com/aliutkus/torchsearchsorted)
 
 ## Test
 `py.test`
