@@ -343,7 +343,6 @@ def test_render_rays():
         else:
             assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy())
     
-test_render_rays()
 
 """
 def test_render():

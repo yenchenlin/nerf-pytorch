@@ -1,18 +1,18 @@
 import torch
+torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-# TODO: remove this
+# TODO: remove this dependency
 from torchsearchsorted import searchsorted
 
+
 # Misc
-# TODO: port these to pytorch
-"""
-img2mse = lambda x, y : tf.reduce_mean(tf.square(x - y))
-mse2psnr = lambda x : -10.*tf.log(x)/tf.log(10.)
+img2mse = lambda x, y : torch.mean((x - y) ** 2)
+mse2psnr = lambda x : -10. * torch.log(x) / torch.log(torch.Tensor([10.]))
 to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
-"""
+
 
 # Positional encoding (section 5.1)
 class Embedder:
@@ -196,7 +196,7 @@ def ndc_rays(H, W, focal, near, rays_o, rays_d):
 # Hierarchical sampling (section 5.2)
 def sample_pdf(bins, weights, N_samples, det=False, pytest=False, u_tf=None):
     # Get pdf
-    weights += 1e-5 # prevent nans
+    weights = weights + 1e-5 # prevent nans
     pdf = weights / torch.sum(weights, -1, keepdim=True)
     cdf = torch.cumsum(pdf, -1)
     cdf = torch.cat([torch.zeros_like(cdf[...,:1]), cdf], -1)  # (batch, len(bins))

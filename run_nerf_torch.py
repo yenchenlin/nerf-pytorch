@@ -17,7 +17,10 @@ from load_deepvoxels import load_dv_data
 from load_blender_torch import load_blender_data
 
 
-# tested
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
+
 def batchify(fn, chunk):
     if chunk is None:
         return fn
@@ -26,7 +29,6 @@ def batchify(fn, chunk):
     return ret
 
 
-# tested
 def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
     
     inputs_flat = torch.reshape(inputs, [-1, inputs.shape[-1]])
@@ -143,7 +145,6 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
 
 
 def create_nerf(args):
-    
     embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
 
     input_ch_views = 0
@@ -154,7 +155,7 @@ def create_nerf(args):
     skips = [4]
     model = NeRF(D=args.netdepth, W=args.netwidth, 
                  input_ch=input_ch, output_ch=output_ch, skips=skips,
-                 input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
+                 input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs).to(device)
     grad_vars = list(model.parameters())
     models = {'model' : model}
     
@@ -163,7 +164,7 @@ def create_nerf(args):
     if args.N_importance > 0:
         model_fine = NeRF(D=args.netdepth_fine, W=args.netwidth_fine, 
                           input_ch=input_ch, output_ch=output_ch, skips=skips,
-                          input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
+                          input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs).to(device)
         grad_vars += list(model_fine.parameters())
         models['model_fine'] = model_fine
             
@@ -194,7 +195,7 @@ def create_nerf(args):
     render_kwargs_test['perturb'] = False
     render_kwargs_test['raw_noise_std'] = 0.
     
-    start=0
+    start = 0
     basedir = args.basedir
     expname = args.expname
     
@@ -266,7 +267,7 @@ def render_rays(ray_batch,
                 pytest=False,
                 t_rand_tf=None,
                 z_samples_tf=None,
-                noise_tf=None):        
+                noise_tf=None):     
     N_rays = ray_batch.shape[0]
     rays_o, rays_d = ray_batch[:,0:3], ray_batch[:,3:6] # [N_rays, 3] each
     viewdirs = ray_batch[:,-3:] if ray_batch.shape[-1] > 8 else None
@@ -510,8 +511,8 @@ def train():
     render_kwargs_train, render_kwargs_test, start, grad_vars, models = create_nerf(args)
     
     bds_dict = {
-        'near' : near.float(),
-        'far' : far.float(),
+        'near' : near,
+        'far' : far,
     }
     render_kwargs_train.update(bds_dict)
     render_kwargs_test.update(bds_dict)
@@ -545,12 +546,9 @@ def train():
     if args.lrate_decay > 0:
         decay_rate = 0.1
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decay_rate)
-        # TODO: remember to step it every args.lrate_decay * 1000 steps
+
     models['optimizer'] = optimizer
-    
-    global_step = tf.compat.v1.train.get_or_create_global_step()
-    global_step.assign(start)
-    
+    global_step = 0
     
     # Prepare raybatch tensor if batching random rays
     N_rand = args.N_rand
@@ -578,10 +576,10 @@ def train():
     print('VAL views are', i_val)
     
     # Summary writers
-    writer = tf.contrib.summary.create_file_writer(os.path.join(basedir, 'summaries', expname))
-    writer.set_as_default()
-        
-        
+    # writer = tf.contrib.summary.create_file_writer(os.path.join(basedir, 'summaries', expname))
+    # writer.set_as_default()
+    
+    rays_rgb = torch.Tensor(rays_rgb).to(device)
     for i in range(start, N_iters):
         time0 = time.time()
         
@@ -590,7 +588,7 @@ def train():
         if use_batching:
             # Random over all images
             batch = rays_rgb[i_batch:i_batch+N_rand] # [B, 2+1, 3*?]
-            batch = torch.transpose(batch, [1,0,2])
+            batch = torch.transpose(batch, 0, 1)
             batch_rays, target_s = batch[:2], batch[2]
 
             i_batch += N_rand
@@ -617,27 +615,27 @@ def train():
         
         
         #####  Core optimization loop  #####
+                    
+        rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, rays=batch_rays, 
+                                                verbose=i < 10, retraw=True, 
+                                                **render_kwargs_train)
         
-        with tf.GradientTape() as tape:
-            
-            rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, rays=batch_rays, 
-                                                   verbose=i < 10, retraw=True, 
-                                                   **render_kwargs_train)
-            
-            img_loss = img2mse(rgb, target_s)
-            trans = extras['raw'][...,-1]
-            loss = img_loss 
-            psnr = mse2psnr(img_loss)
-            
-            if 'rgb0' in extras:
-                img_loss0 = img2mse(extras['rgb0'], target_s)
-                loss += img_loss0
-                psnr0 = mse2psnr(img_loss0)
+        optimizer.zero_grad()
+        img_loss = img2mse(rgb, target_s)
+        trans = extras['raw'][...,-1]
+        loss = img_loss 
+        psnr = mse2psnr(img_loss)
+        
+        if 'rgb0' in extras:
+            img_loss0 = img2mse(extras['rgb0'], target_s)
+            loss = loss + img_loss0
+            psnr0 = mse2psnr(img_loss0)
 
-        gradients = tape.gradient(loss, grad_vars)
-        optimizer.apply_gradients(zip(gradients, grad_vars))
+        loss.backward()
+        optimizer.step()
         
         dt = time.time()-time0
+        print(f"Step: {global_step}, Loss: {loss}, Time: {dt}")
         
         #####           end            #####
         
@@ -721,7 +719,9 @@ def train():
         """        
                     
 
-        global_step.assign_add(1)
+        global_step += 1
+        if global_step % args.lrate_decay * 1000 == 0:
+            lr_scheduler.step()
 
     
 if __name__=='__main__':
