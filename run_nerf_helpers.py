@@ -168,6 +168,17 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
     else:
         u = tf.random.uniform(list(cdf.shape[:-1]) + [N_samples])
 
+    # Pytest, overwrite u with numpy's fixed random numbers
+    if pytest:
+        np.random.seed(0)
+        new_shape = cdf.get_shape().as_list()[:-1] + [N_samples]
+        if det:
+            u = np.linspace(0., 1., N_samples)
+            u = np.broadcast_to(u, new_shape)
+        else:
+            u = np.random.rand(*new_shape)
+        u = tf.cast(u, tf.float32)
+
     # Invert CDF
     inds = tf.searchsorted(cdf, u, side='right')
     below = tf.maximum(0, inds-1)
@@ -182,7 +193,4 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
     t = (u-cdf_g[...,0])/denom
     samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
 
-    if not pytest:
-        return samples
-    else:
-        return samples, u.numpy()
+    return samples

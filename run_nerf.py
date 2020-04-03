@@ -99,6 +99,13 @@ def render_rays(ray_batch,
         noise = 0.
         if raw_noise_std > 0.:
             noise = tf.random.normal(raw[...,3].shape) * raw_noise_std
+
+            # Overwrite randomly sampled data if pytest
+            if pytest:
+                np.random.seed(0)
+                noise = np.random.rand(*noise.get_shape().as_list()) * raw_noise_std
+                noise = tf.cast(noise, tf.float32)
+
         alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
         weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
         rgb_map = tf.reduce_sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
@@ -109,10 +116,6 @@ def render_rays(ray_batch,
         
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[...,None])
-        
-        # Added for testing
-        if pytest:
-            return rgb_map, disp_map, acc_map, weights, depth_map, noise
 
         return rgb_map, disp_map, acc_map, weights, depth_map
     
@@ -142,6 +145,13 @@ def render_rays(ray_batch,
         lower = tf.concat([z_vals[...,:1], mids], -1)
         # stratified samples in those intervals
         t_rand = tf.random.uniform(z_vals.shape)
+
+        # Pytest, overwrite u with numpy's fixed random numbers
+        if pytest:
+            np.random.seed(0)
+            t_rand = np.random.rand(*z_vals.get_shape().as_list())
+            t_rand = tf.cast(t_rand, tf.float32)
+
         z_vals = lower + (upper - lower) * t_rand
         
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
@@ -149,14 +159,14 @@ def render_rays(ray_batch,
         
 #     raw = run_network(pts)
     raw = network_query_fn(pts, viewdirs, network_fn)
-    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d)
+    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, pytest=pytest)
     
     if N_importance > 0:
         
         rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
         
         z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
-        z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.))
+        z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.), pytest=pytest)
         z_samples = tf.stop_gradient(z_samples)
         
         z_vals = tf.sort(tf.concat([z_vals, z_samples], -1), -1)
@@ -165,10 +175,7 @@ def render_rays(ray_batch,
         run_fn = network_fn if network_fine is None else network_fine
 #         raw = run_network(pts, fn=run_fn)
         raw = network_query_fn(pts, viewdirs, run_fn)
-        if not pytest:
-            rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d)
-        else:
-            rgb_map, disp_map, acc_map, weights, depth_map, noise = raw2outputs(raw, z_vals, rays_d, pytest=True)
+        rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, pytest=pytest)
         
     ret = {'rgb_map' : rgb_map, 'disp_map' : disp_map, 'acc_map' : acc_map}
     if retraw:
@@ -179,15 +186,6 @@ def render_rays(ray_batch,
         ret['acc0'] = acc_map_0
         ret['z_std'] = tf.math.reduce_std(z_samples, -1) # [N_rays]
         
-    
-    # Added for pytest
-    if pytest:
-        if perturb > 0.:
-            ret['t_rand'] = t_rand.numpy()
-        if N_importance > 0:
-            ret['z_samples'] = z_samples.numpy()
-            ret['noise'] = noise.numpy()
-
     for k in ret:
         tf.debugging.check_numerics(ret[k], 'output {}'.format(k))
         
@@ -652,7 +650,6 @@ def train():
         #####  Core optimization loop  #####
         
         with tf.GradientTape() as tape:
-            
             rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, rays=batch_rays, 
                                                    verbose=i < 10, retraw=True, 
                                                    **render_kwargs_train)
@@ -671,7 +668,7 @@ def train():
         optimizer.apply_gradients(zip(gradients, grad_vars))
         
         dt = time.time()-time0
-        
+        print(f"Step: {global_step.numpy()}, Loss: {loss}, Time: {dt}")
         #####           end            #####
         
         

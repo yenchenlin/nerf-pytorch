@@ -63,8 +63,8 @@ def test_sample_pdf():
     bins_torch = torch.Tensor(bins)
     weights_torch = torch.Tensor(weights)
     
-    samples_tf, u_tf = sample_pdf_tf(bins_tf, weights_tf, N_samples, pytest=True)
-    samples_torch = sample_pdf_torch(bins_torch, weights_torch, N_samples, pytest=True, u_tf=torch.Tensor(u_tf))
+    samples_tf = sample_pdf_tf(bins_tf, weights_tf, N_samples, pytest=True)
+    samples_torch = sample_pdf_torch(bins_torch, weights_torch, N_samples, pytest=True)
 
     assert np.allclose(samples_tf.numpy(), samples_torch.numpy())
 
@@ -180,7 +180,7 @@ def test_load_blender_data():
 
 
 def test_raw2outputs():
-    raw_noise_std = 0
+    raw_noise_std = 1
     white_bkgd = False
 
     raw = np.random.rand(10, 5, 4)
@@ -197,7 +197,7 @@ def test_raw2outputs():
 
     from run_nerf_torch import raw2outputs as raw2outputs_torch
     # Function copied from run_nerf.py
-    def raw2outputs_tf(raw, z_vals, rays_d):
+    def raw2outputs_tf(raw, z_vals, rays_d, pytest=False):
         raw2alpha = lambda raw, dists, act_fn=tf.nn.relu: 1.-tf.exp(-act_fn(raw)*dists)
         
         dists = z_vals[...,1:] - z_vals[...,:-1]
@@ -209,6 +209,13 @@ def test_raw2outputs():
         noise = 0.
         if raw_noise_std > 0.:
             noise = tf.random.normal(raw[...,3].shape) * raw_noise_std
+
+            # Overwrite randomly sampled data if pytest
+            if pytest:
+                np.random.seed(0)
+                noise = np.random.rand(*noise.get_shape().as_list()) * raw_noise_std
+                noise = tf.cast(noise, tf.float32)
+
         alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
         weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
         rgb_map = tf.reduce_sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
@@ -219,11 +226,11 @@ def test_raw2outputs():
         
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[...,None])
-        
+
         return rgb_map, disp_map, acc_map, weights, depth_map
     
-    rgb_map_tf, disp_map_tf, acc_map_tf, weights_tf, depth_map_tf = raw2outputs_tf(raw_tf, z_vals_tf, rays_d_tf)
-    rgb_map_torch, disp_map_torch, acc_map_torch, weights_torch, depth_map_torch = raw2outputs_torch(raw_torch, z_vals_torch, rays_d_torch, raw_noise_std, white_bkgd)
+    rgb_map_tf, disp_map_tf, acc_map_tf, weights_tf, depth_map_tf = raw2outputs_tf(raw_tf, z_vals_tf, rays_d_tf, pytest=True)
+    rgb_map_torch, disp_map_torch, acc_map_torch, weights_torch, depth_map_torch = raw2outputs_torch(raw_torch, z_vals_torch, rays_d_torch, raw_noise_std, white_bkgd, pytest=True)
     
     assert np.allclose(rgb_map_tf.numpy(), rgb_map_torch.numpy())
     assert np.allclose(disp_map_tf.numpy(), disp_map_torch.numpy())
@@ -278,9 +285,9 @@ def test_render_rays():
               'retraw': True, 
               'network_query_fn': network_query_fn_tf, 
               'perturb': 1, 
-              'N_importance': 64, 
+              'N_importance': 5, 
               'network_fine': model_fine_tf, 
-              'N_samples': 64, 
+              'N_samples': 5, 
               'network_fn': model_coarse_tf, 
               'white_bkgd': False, 
               'raw_noise_std': 1.0,
@@ -321,35 +328,35 @@ def test_render_rays():
               'retraw': True, 
               'network_query_fn': network_query_fn_torch, 
               'perturb': 1, 
-              'N_importance': 64, 
+              'N_importance': 5, 
               'network_fine': model_fine_torch, 
-              'N_samples': 64, 
+              'N_samples': 5, 
               'network_fn': model_coarse_torch, 
               'white_bkgd': False, 
               'raw_noise_std': 1.0,
-              'pytest': True,
-              't_rand_tf': torch.Tensor(ret_tf['t_rand']),
-              'z_samples_tf': torch.Tensor(ret_tf['z_samples']),
-              'noise_tf': torch.Tensor(ret_tf['noise'])}
+              'pytest': True}
 
     # Run    
     ret_torch = render_rays_torch(ray_batch_torch, **kwargs)
 
     ###################################
+
     keys = ['rgb_map', 'disp_map', 'acc_map', 'raw']
     for key in keys:
         if key == 'raw':
-            assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy(), atol=1e-6)
+            assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy(), atol=1e-5)
         else:
             assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy())
-    
+
+test_render_rays()
 
 """
 def test_render():
     from run_nerf_helpers_torch import get_rays, get_rays_np
     from run_nerf_torch import render
-    H, W, focal = int(400 / 40), int(400 / 40), 555.555 / 40
-    hwf = [H, W, focal]
+    
+    H, W, focal = 378, 504, 407.5658
+    chunk = 1024 * 32
     pose = np.array([
         [-0.9305, 0.1170, -0.3469, -1.3986],
         [-0.3661, -0.2975, 0.8817, 3.554],
