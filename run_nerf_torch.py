@@ -7,6 +7,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
 
@@ -19,7 +20,7 @@ from load_blender_torch import load_blender_data
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-DEBUG = True
+DEBUG = False
 np.random.seed(0)
 if DEBUG:
     import ipdb
@@ -536,10 +537,6 @@ def train():
         
     # Create optimizer
     optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
-    
-    # if args.lrate_decay > 0:
-    #     decay_rate = 0.1
-    #     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decay_rate)
 
     models['optimizer'] = optimizer
     global_step = 0
@@ -572,8 +569,7 @@ def train():
     print('VAL views are', i_val)
     
     # Summary writers
-    # writer = tf.contrib.summary.create_file_writer(os.path.join(basedir, 'summaries', expname))
-    # writer.set_as_default()
+    writer = SummaryWriter(os.path.join(basedir, 'summaries', expname))
 
     if DEBUG:
         render_kwargs_train['network_fn'].load_weights_from_keras(np.load('./test_weights/model_coarse.npy', allow_pickle=True))
@@ -582,9 +578,14 @@ def train():
         render_kwargs_train['network_fine'].to(device)
 
     rays_rgb = torch.Tensor(rays_rgb).to(device)
+    render_poses = torch.Tensor(render_poses).to(device)
 
     for i in range(start, N_iters):
         time0 = time.time()
+
+        # Turn on training mode
+        models['model'].train()
+        models['model_fine'].train()
         
         # Sample random ray batch
         
@@ -658,27 +659,28 @@ def train():
         dt = time.time()-time0
         print(f"Step: {global_step}, Loss: {loss}, Time: {dt}")
         
-        # TODO: Move it to the bottom (after logging) later
-        global_step += 1
         #####           end            #####
         
         if DEBUG:
             continue
         
         # Rest is logging
-        """
-        def save_weights(net, prefix, i): 
-            path = os.path.join(basedir, expname, '{}_{:06d}.npy'.format(prefix, i))
-            np.save(path, net.get_weights())
+        
+        def save_weights(model, prefix, i): 
+            path = os.path.join(basedir, expname, '{}_{:06d}.pth'.format(prefix, i))
+            torch.save(model, path)
             print('saved weights at', path)
     
         if i%args.i_weights==0:
             for k in models:
                 save_weights(models[k], k, i)
                 
-            
-        if i%args.i_video==0 and i > 0:
-            
+        """
+        if i%args.i_video==0: # and i > 0:
+            # Turn on testing mode
+            models['model'].eval()
+            models['model_fine'].eval()
+
             rgbs, disps = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
             print('Done, saving', rgbs.shape, disps.shape)
             moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
@@ -690,7 +692,6 @@ def train():
                 rgbs_still, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
                 render_kwargs_test['c2w_staticcam'] = None
                 imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
-                
                 
         if i%args.i_testset==0 and i > 0:
             testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
@@ -743,8 +744,7 @@ def train():
                         tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis,...,tf.newaxis])
         """        
                     
-
-        # global_step += 1
+        global_step += 1
 
     
 if __name__=='__main__':
