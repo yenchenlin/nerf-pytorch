@@ -29,7 +29,7 @@ def test_positional_encoding():
 
 def test_get_rays():
     from run_nerf_helpers_torch import get_rays, get_rays_np
-    H, W, focal = int(400 / 40), int(400 / 40), 555.555 / 40
+    H, W, focal = int(378/18), int(504/18), 407.5658/18
     hwf = [H, W, focal]
     pose = np.array([
         [-0.9305, 0.1170, -0.3469, -1.3986],
@@ -239,7 +239,7 @@ def test_raw2outputs():
     assert np.allclose(depth_map_tf.numpy(), depth_map_torch.numpy())
 
 
-def prepare_data_and_model():
+def prepare_model():
     # Hyperparams
     use_viewdirs = True
     multires = 10
@@ -248,11 +248,6 @@ def prepare_data_and_model():
     N_importance = 64
     output_ch = 5 if N_importance > 0 else 4
     skips = [4]
-
-    # Prepare data
-    ray_batch = np.random.rand(10, 11)  # (batch, dim)
-    ray_batch_tf = tf.cast(ray_batch, tf.float32)
-    ray_batch_torch = torch.Tensor(ray_batch)
 
     ###################################
 
@@ -328,13 +323,19 @@ def prepare_data_and_model():
                     'raw_noise_std': 1.0,
                     'pytest': True}
 
-    return ray_batch_tf, kwargs_tf, ray_batch_torch, kwargs_torch
+    return kwargs_tf, kwargs_torch
 
 
 def test_render_rays():
     from run_nerf import render_rays as render_rays_tf
     from run_nerf_torch import render_rays as render_rays_torch
-    ray_batch_tf, kwargs_tf, ray_batch_torch, kwargs_torch = prepare_data_and_model()
+
+    # Prepare data
+    ray_batch = np.random.rand(10, 11)  # (batch, dim)
+    ray_batch_tf = tf.cast(ray_batch, tf.float32)
+    ray_batch_torch = torch.Tensor(ray_batch)
+
+    kwargs_tf, kwargs_torch = prepare_model()
 
     # Run
     ret_tf = render_rays_tf(ray_batch_tf, **kwargs_tf)
@@ -350,18 +351,33 @@ def test_render_rays():
             assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy())
 
 
-"""
-def test_render():
-    from run_nerf_helpers_torch import get_rays, get_rays_np
-    from run_nerf_torch import render
+def test_render():    
+    from run_nerf import render as render_tf
+    from run_nerf_torch import render as render_torch
     
-    H, W, focal = 378, 504, 407.5658
+    # Prepare data
+    H, W, focal = int(378/18), int(504/18), 407.5658/18
     chunk = 1024 * 32
     pose = np.array([
         [-0.9305, 0.1170, -0.3469, -1.3986],
         [-0.3661, -0.2975, 0.8817, 3.554],
         [0, 0.9475, 0.3197, 1.288]
     ])
+    pose_tf = tf.cast(pose, tf.float32)
+    pose_torch = torch.Tensor(pose)
 
-    render(H, W, focal, chunk=1024, c2w=pose[:3,:4], **render_kwargs)
-"""
+    kwargs_tf, kwargs_torch = prepare_model()
+
+    ret_tf = render_tf(H, W, focal, chunk=1024, c2w=pose_tf[:3,:4], use_viewdirs=True, **kwargs_tf)
+    ret_torch = render_torch(H, W, focal, chunk=1024, c2w=pose_torch[:3, :4], use_viewdirs=True, **kwargs_torch)
+    
+    assert np.allclose(ret_tf[0].numpy(), ret_torch[0].detach().numpy(), atol=1e-4)
+    assert np.allclose(ret_tf[2].numpy(), ret_torch[2].detach().numpy(), atol=1e-4)
+    assert np.allclose(ret_tf[3]['rgb0'].numpy(), ret_torch[3]['rgb0'].detach().numpy(), atol=1e-4)
+    """
+    for i in range(len(ret_tf) - 1):
+        print(i)
+        assert np.allclose(ret_tf[i].numpy(), ret_torch[i].detach().numpy(), atol=1e-4)
+    """
+
+test_render()
