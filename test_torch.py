@@ -239,10 +239,7 @@ def test_raw2outputs():
     assert np.allclose(depth_map_tf.numpy(), depth_map_torch.numpy())
 
 
-def test_render_rays():
-    # Only run this test if CUDA is available
-    assert torch.cuda.is_available()
-    
+def prepare_data_and_model():
     # Hyperparams
     use_viewdirs = True
     multires = 10
@@ -263,38 +260,34 @@ def test_render_rays():
     from run_nerf_helpers import init_nerf_model
     from run_nerf_helpers import get_embedder as get_embedder_tf
     from run_nerf import run_network as run_network_tf
-    from run_nerf import render_rays as render_rays_tf
 
     # Init
-    embed_fn, input_ch = get_embedder_tf(multires, i_embed)
+    embed_fn_tf, input_ch = get_embedder_tf(multires, i_embed)
     input_ch_views = 0
-    embeddirs_fn = None
+    embeddirs_fn_tf = None
     if use_viewdirs:
-        embeddirs_fn, input_ch_views = get_embedder_tf(multires_views, i_embed)
+        embeddirs_fn_tf, input_ch_views = get_embedder_tf(multires_views, i_embed)
 
     model_coarse_tf = init_nerf_model(input_ch=input_ch, output_ch=output_ch, skips=skips,
                                       input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
     model_fine_tf = init_nerf_model(input_ch=input_ch, output_ch=output_ch, skips=skips,
                                     input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
     network_query_fn_tf = lambda inputs, viewdirs, network_fn : run_network_tf(inputs, viewdirs, network_fn,
-                                                                embed_fn=embed_fn, 
-                                                                embeddirs_fn=embeddirs_fn,
+                                                                embed_fn=embed_fn_tf, 
+                                                                embeddirs_fn=embeddirs_fn_tf,
                                                                 netchunk=1024*64)
 
-    kwargs = {'verbose': True, 
-              'retraw': True, 
-              'network_query_fn': network_query_fn_tf, 
-              'perturb': 1, 
-              'N_importance': 5, 
-              'network_fine': model_fine_tf, 
-              'N_samples': 5, 
-              'network_fn': model_coarse_tf, 
-              'white_bkgd': False, 
-              'raw_noise_std': 1.0,
-              'pytest': True}
-
-    # Run    
-    ret_tf = render_rays_tf(ray_batch_tf, **kwargs)
+    kwargs_tf = {'verbose': True, 
+                 'retraw': True, 
+                 'network_query_fn': network_query_fn_tf, 
+                 'perturb': 1, 
+                 'N_importance': 5, 
+                 'network_fine': model_fine_tf, 
+                 'N_samples': 5, 
+                 'network_fn': model_coarse_tf, 
+                 'white_bkgd': False, 
+                 'raw_noise_std': 1.0,
+                 'pytest': True}
 
     ###################################
 
@@ -302,14 +295,13 @@ def test_render_rays():
     from run_nerf_helpers_torch import NeRF
     from run_nerf_helpers_torch import get_embedder as get_embedder_torch
     from run_nerf_torch import run_network as run_network_torch
-    from run_nerf_torch import render_rays as render_rays_torch
-
+    
     # Init
-    embed_fn, input_ch = get_embedder_torch(multires, i_embed)
+    embed_fn_torch, input_ch = get_embedder_torch(multires, i_embed)
     input_ch_views = 0
-    embeddirs_fn = None
+    embeddirs_fn_torch = None
     if use_viewdirs:
-        embeddirs_fn, input_ch_views = get_embedder_torch(multires_views, i_embed)
+        embeddirs_fn_torch, input_ch_views = get_embedder_torch(multires_views, i_embed)
 
     model_coarse_torch = NeRF(input_ch=input_ch, output_ch=output_ch, skips=skips,
                               input_ch_views=input_ch_views, use_viewdirs=use_viewdirs)
@@ -320,24 +312,33 @@ def test_render_rays():
     model_fine_torch.load_weights_from_keras(model_fine_tf.get_weights())
 
     network_query_fn_torch = lambda inputs, viewdirs, network_fn : run_network_torch(inputs, viewdirs, network_fn,
-                                                                embed_fn=embed_fn, 
-                                                                embeddirs_fn=embeddirs_fn,
+                                                                embed_fn=embed_fn_torch, 
+                                                                embeddirs_fn=embeddirs_fn_torch,
                                                                 netchunk=1024*64)
 
-    kwargs = {'verbose': True, 
-              'retraw': True, 
-              'network_query_fn': network_query_fn_torch, 
-              'perturb': 1, 
-              'N_importance': 5, 
-              'network_fine': model_fine_torch, 
-              'N_samples': 5, 
-              'network_fn': model_coarse_torch, 
-              'white_bkgd': False, 
-              'raw_noise_std': 1.0,
-              'pytest': True}
+    kwargs_torch = {'verbose': True, 
+                    'retraw': True, 
+                    'network_query_fn': network_query_fn_torch, 
+                    'perturb': 1, 
+                    'N_importance': 5, 
+                    'network_fine': model_fine_torch, 
+                    'N_samples': 5, 
+                    'network_fn': model_coarse_torch, 
+                    'white_bkgd': False, 
+                    'raw_noise_std': 1.0,
+                    'pytest': True}
 
-    # Run    
-    ret_torch = render_rays_torch(ray_batch_torch, **kwargs)
+    return ray_batch_tf, kwargs_tf, ray_batch_torch, kwargs_torch
+
+
+def test_render_rays():
+    from run_nerf import render_rays as render_rays_tf
+    from run_nerf_torch import render_rays as render_rays_torch
+    ray_batch_tf, kwargs_tf, ray_batch_torch, kwargs_torch = prepare_data_and_model()
+
+    # Run
+    ret_tf = render_rays_tf(ray_batch_tf, **kwargs_tf)
+    ret_torch = render_rays_torch(ray_batch_torch, **kwargs_torch)
 
     ###################################
 
@@ -348,7 +349,6 @@ def test_render_rays():
         else:
             assert np.allclose(ret_torch[key].detach().numpy(), ret_tf[key].numpy())
 
-test_render_rays()
 
 """
 def test_render():
