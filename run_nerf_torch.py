@@ -19,6 +19,11 @@ from load_blender_torch import load_blender_data
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+DEBUG = True
+np.random.seed(0)
+if DEBUG:
+    import ipdb
+
 
 def batchify(fn, chunk):
     if chunk is None:
@@ -183,6 +188,8 @@ def create_nerf(args):
         'white_bkgd' : args.white_bkgd,
         'raw_noise_std' : args.raw_noise_std,
     }
+    if DEBUG:
+        render_kwargs_train['pytest'] = True
     
     # NDC only good for LLFF-style forward facing data
     if args.dataset_type != 'llff' or args.no_ndc:
@@ -203,6 +210,7 @@ def create_nerf(args):
     else:
         ckpts = [os.path.join(basedir, expname, f) for f in sorted(os.listdir(os.path.join(basedir, expname))) if
              ('model_' in f and 'fine' not in f and 'optimizer' not in f)]
+
     print('Found ckpts', ckpts)
     if len(ckpts) > 0 and not args.no_reload:
         ft_weights = ckpts[-1]
@@ -527,12 +535,11 @@ def train():
         
         
     # Create optimizer
-    lrate = args.lrate
-    optimizer = torch.optim.Adam(params=grad_vars, lr=lrate, betas=(0.9, 0.999))
+    optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
     
-    if args.lrate_decay > 0:
-        decay_rate = 0.1
-        lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decay_rate)
+    # if args.lrate_decay > 0:
+    #     decay_rate = 0.1
+    #     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decay_rate)
 
     models['optimizer'] = optimizer
     global_step = 0
@@ -551,7 +558,9 @@ def train():
         rays_rgb = np.reshape(rays_rgb, [-1,3,3]) # [(N-1)*H*W, ro+rd+rgb, 3]    
         rays_rgb = rays_rgb.astype(np.float32)
         print('shuffle rays')
+
         np.random.shuffle(rays_rgb)
+
         print('done')
         i_batch = 0
         
@@ -565,8 +574,15 @@ def train():
     # Summary writers
     # writer = tf.contrib.summary.create_file_writer(os.path.join(basedir, 'summaries', expname))
     # writer.set_as_default()
-    
+
+    if DEBUG:
+        render_kwargs_train['network_fn'].load_weights_from_keras(np.load('./test_weights/model_coarse.npy', allow_pickle=True))
+        render_kwargs_train['network_fine'].load_weights_from_keras(np.load('./test_weights/model_fine.npy', allow_pickle=True))
+        render_kwargs_train['network_fn'].to(device)
+        render_kwargs_train['network_fine'].to(device)
+
     rays_rgb = torch.Tensor(rays_rgb).to(device)
+
     for i in range(start, N_iters):
         time0 = time.time()
         
@@ -601,12 +617,12 @@ def train():
                 batch_rays_torch = torch.stack([rays_o, rays_d], 0)
                 target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
         
-        
         #####  Core optimization loop  #####
                     
         rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, rays=batch_rays, 
                                                 verbose=i < 10, retraw=True, 
                                                 **render_kwargs_train)
+
         
         optimizer.zero_grad()
         img_loss = img2mse(rgb, target_s)
@@ -619,14 +635,35 @@ def train():
             loss = loss + img_loss0
             psnr0 = mse2psnr(img_loss0)
 
-        loss.backward()
-        optimizer.step()
         
+
+        loss.backward()
+
+        # if DEBUG:
+        #     ipdb.set_trace()
+
+        # NOTE: same as tf till here - 04/03/2020
+
+        optimizer.step()
+
+        # NOTE: IMPORTANT!
+        ###   update learning rate   ###
+        decay_rate = 0.1
+        decay_steps = args.lrate_decay * 1000
+        new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = new_lrate
+        ################################
+
         dt = time.time()-time0
         print(f"Step: {global_step}, Loss: {loss}, Time: {dt}")
         
+        # TODO: Move it to the bottom (after logging) later
+        global_step += 1
         #####           end            #####
         
+        if DEBUG:
+            continue
         
         # Rest is logging
         """
@@ -707,11 +744,10 @@ def train():
         """        
                     
 
-        global_step += 1
-        if global_step % args.lrate_decay * 1000 == 0:
-            lr_scheduler.step()
+        # global_step += 1
 
     
 if __name__=='__main__':
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    
     train()

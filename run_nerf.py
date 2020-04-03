@@ -19,6 +19,11 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 
 
+DEBUG = True
+np.random.seed(0)
+if DEBUG:
+    import ipdb
+
     
 def batchify(fn, chunk):
     if chunk is None:
@@ -62,7 +67,7 @@ def render_rays(ray_batch,
 #                 netchunk=1024*64,
                 verbose=False,
                 pytest=False):
-    
+
 #     def batchify(fn, chunk=netchunk):
 #         if chunk is None:
 #             return fn
@@ -340,6 +345,8 @@ def create_nerf(args):
         'white_bkgd' : args.white_bkgd,
         'raw_noise_std' : args.raw_noise_std,
     }
+    if DEBUG:
+        render_kwargs_train['pytest'] = True
     
     # NDC only good for LLFF-style forward facing data
     if args.dataset_type != 'llff' or args.no_ndc:
@@ -362,6 +369,7 @@ def create_nerf(args):
     else:
         ckpts = [os.path.join(basedir, expname, f) for f in sorted(os.listdir(os.path.join(basedir, expname))) if
              ('model_' in f and 'fine' not in f and 'optimizer' not in f)]
+    
     print('Found ckpts', ckpts)
     if len(ckpts) > 0 and not args.no_reload:
         ft_weights = ckpts[-1]
@@ -596,8 +604,10 @@ def train():
         rays_rgb = np.stack([rays_rgb[i] for i in i_train], 0) # train images only
         rays_rgb = np.reshape(rays_rgb, [-1,3,3]) # [(N-1)*H*W, ro+rd+rgb, 3]    
         rays_rgb = rays_rgb.astype(np.float32)
+        
         print('shuffle rays')
         np.random.shuffle(rays_rgb)
+
         print('done')
         i_batch = 0
         
@@ -611,8 +621,11 @@ def train():
     # Summary writers
     writer = tf.contrib.summary.create_file_writer(os.path.join(basedir, 'summaries', expname))
     writer.set_as_default()
-        
-        
+
+    if DEBUG:
+        render_kwargs_train['network_fn'].set_weights(np.load('./test_weights/model_coarse.npy', allow_pickle=True))
+        render_kwargs_train['network_fine'].set_weights(np.load('./test_weights/model_fine.npy', allow_pickle=True))
+
     for i in range(start, N_iters):
         time0 = time.time()
         
@@ -646,14 +659,13 @@ def train():
                 batch_rays = tf.stack([rays_o, rays_d], 0)
                 target_s = tf.gather_nd(target, select_inds)
         
-        
         #####  Core optimization loop  #####
         
         with tf.GradientTape() as tape:
             rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, rays=batch_rays, 
                                                    verbose=i < 10, retraw=True, 
                                                    **render_kwargs_train)
-            
+
             img_loss = img2mse(rgb, target_s)
             trans = extras['raw'][...,-1]
             loss = img_loss 
@@ -665,13 +677,19 @@ def train():
                 psnr0 = mse2psnr(img_loss0)
 
         gradients = tape.gradient(loss, grad_vars)
+
+        # if DEBUG:
+        #     ipdb.set_trace()
+
         optimizer.apply_gradients(zip(gradients, grad_vars))
         
         dt = time.time()-time0
         print(f"Step: {global_step.numpy()}, Loss: {loss}, Time: {dt}")
         #####           end            #####
         
-        
+        if DEBUG:
+            continue
+
         # Rest is logging
 
         def save_weights(net, prefix, i): 
@@ -755,4 +773,5 @@ def train():
 
     
 if __name__=='__main__':
+    
     train()
