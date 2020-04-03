@@ -371,13 +371,10 @@ def test_render():
     ret_tf = render_tf(H, W, focal, chunk=1024, c2w=pose_tf[:3,:4], use_viewdirs=True, **kwargs_tf)
     ret_torch = render_torch(H, W, focal, chunk=1024, c2w=pose_torch[:3, :4], use_viewdirs=True, **kwargs_torch)
     
-    assert np.allclose(ret_tf[0].numpy(), ret_torch[0].detach().numpy(), atol=1e-4)
-    assert np.allclose(ret_tf[2].numpy(), ret_torch[2].detach().numpy(), atol=1e-4)
-    assert np.allclose(ret_tf[3]['rgb0'].numpy(), ret_torch[3]['rgb0'].detach().numpy(), atol=1e-4)
-    """
-    for i in range(len(ret_tf) - 1):
-        print(i)
-        assert np.allclose(ret_tf[i].numpy(), ret_torch[i].detach().numpy(), atol=1e-4)
-    """
+    assert np.allclose(ret_tf[0].numpy(), ret_torch[0].detach().numpy(), atol=1e-3)
+    assert np.allclose(ret_tf[2].numpy(), ret_torch[2].detach().numpy(), atol=1e-3)
+    assert np.allclose(ret_tf[3]['rgb0'].numpy(), ret_torch[3]['rgb0'].detach().numpy(), atol=1e-3)
 
-test_render()
+    # For disp_map, tf turns `nan` into 1e+10. We only need to compare valid values.
+    idxs = ret_tf[1].numpy() != 1e+10
+    assert np.allclose(ret_tf[1].numpy()[idxs], ret_torch[1].detach().numpy()[idxs], atol=1e-3)
