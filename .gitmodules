@@ -1,0 +1,3 @@
+[submodule "torchsearchsorted"]
+	path = torchsearchsorted
+	url = https://github.com/aliutkus/torchsearchsorted.git
