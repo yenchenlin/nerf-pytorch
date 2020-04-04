@@ -136,7 +136,7 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
             print(rgb.shape, disp.shape)
                 
         if gt_imgs is not None and render_factor==0:
-            p = -10. * np.log10(np.mean(np.square(rgb - gt_imgs[i])))
+            p = -10. * np.log10(np.mean(np.square(rgb.cpu().numpy() - gt_imgs[i])))
             print(p)
             
         if savedir is not None:
@@ -198,7 +198,7 @@ def create_nerf(args):
         print('Reloading from', ckpt_path)
         ckpt = torch.load(ckpt_path)
 
-        start = ckpt['global_step']
+        start = ckpt['global_step'] + 1
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         
         # Load model
@@ -599,8 +599,9 @@ def train():
 
             i_batch += N_rand
             if i_batch >= rays_rgb.shape[0]:
-                # TODO: use pytorch to shuffle data
-                np.random.shuffle(rays_rgb)
+                print("Shuffle data after an epoch!")
+                rand_idx = torch.randperm(rays_rgb.shape[0])
+                rays_rgb = rays_rgb[rand_idx]
                 i_batch = 0
             
         else:
@@ -682,24 +683,23 @@ def train():
             imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
             imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.max(disps)), fps=30, quality=8)
             
-            if args.use_viewdirs:
-                render_kwargs_test['c2w_staticcam'] = render_poses[0][:3,:4]
-                with torch.no_grad():
-                    rgbs_still, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
-                render_kwargs_test['c2w_staticcam'] = None
-                imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
+            # if args.use_viewdirs:
+            #     render_kwargs_test['c2w_staticcam'] = render_poses[0][:3,:4]
+            #     with torch.no_grad():
+            #         rgbs_still, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
+            #     render_kwargs_test['c2w_staticcam'] = None
+            #     imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
         
-        """
         if i%args.i_testset==0 and i > 0:
             testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
             with torch.no_grad():
-                render_path(poses[i_test], hwf, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
+                render_path(torch.Tensor(poses[i_test]).to(device), hwf, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
             print('Saved test set') 
             
             
-
+        """
         if i%args.i_print==0 or i < 10:
             
             print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
