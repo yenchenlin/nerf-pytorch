@@ -567,6 +567,12 @@ def train():
 
         print('done')
         i_batch = 0
+
+    # Move training data to GPU
+    images = torch.Tensor(images).to(device)
+    poses = torch.Tensor(poses).to(device)
+    if use_batching:
+        rays_rgb = torch.Tensor(rays_rgb).to(device)
         
     
     N_iters = 1000000
@@ -583,9 +589,6 @@ def train():
         render_kwargs_train['network_fine'].load_weights_from_keras(np.load('./test_weights/model_fine.npy', allow_pickle=True))
         render_kwargs_train['network_fn'].to(device)
         render_kwargs_train['network_fine'].to(device)
-
-    # Move training data to GPU
-    rays_rgb = torch.Tensor(rays_rgb).to(device)
 
     for i in range(start, N_iters):
         time0 = time.time()
@@ -611,16 +614,16 @@ def train():
             pose = poses[img_i, :3,:4]
             
             if N_rand is not None:
-                rays_o, rays_d = get_rays(H, W, focal, pose)  # (H, W, 3), (H, W, 3)
+                rays_o, rays_d = get_rays(H, W, focal, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
                 coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
                 coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
                 select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
                 select_coords = coords[select_inds].long()  # (N_rand, 2)
                 rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
                 rays_d = rays_d[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-                batch_rays_torch = torch.stack([rays_o, rays_d], 0)
+                batch_rays = torch.stack([rays_o, rays_d], 0)
                 target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-        
+
         #####  Core optimization loop  #####
         rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, rays=batch_rays, 
                                                 verbose=i < 10, retraw=True, 
