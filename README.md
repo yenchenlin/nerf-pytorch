@@ -2,19 +2,6 @@
 
 A faithful PyTorch implementation of [NeRF](http://www.matthewtancik.com/nerf) that **reproduces** the results while running **1.3 times faster**. This repository is based on authors' Tensorflow implementation [here](https://github.com/bmild/nerf).
 
-## Dependencies:
-
-- PyTorch 1.4
-- matplotlib
-- numpy
-- imageio
-- imageio-ffmpeg
-- configargparse
-
-The LLFF data loader requires ImageMagick.
-
-You will also need the [LLFF code](http://github.com/fyusion/llff) (and COLMAP) set up to compute poses if you want to run on your own real data.
-
 ## Installation
 
 ```
@@ -22,6 +9,23 @@ git clone https://github.com/yenchenlin/nerf-pytorch.git
 cd nerf-pytorch
 python setup.py install
 ```
+
+<details>
+  <summary> Dependencies (click to expand) </summary>
+  
+  ## Dependencies
+  - PyTorch 1.4
+  - matplotlib
+  - numpy
+  - imageio
+  - imageio-ffmpeg
+  - configargparse
+  
+The LLFF data loader requires ImageMagick.
+
+You will also need the [LLFF code](http://github.com/fyusion/llff) (and COLMAP) set up to compute poses if you want to run on your own real data.
+  
+</details>
 
 ## Run
 To optimize a low-res Fern NeRF:
