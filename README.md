@@ -1,7 +1,7 @@
 # NeRF-pytorch
 
 ## Setup
-- `pip install ipdb configargparse imageio matplotlib`
+- `pip install ipdb configargparse imageio matplotlib imageio-ffmpeg`
 - `pip install torch`
 - Install [torchsearchsorted](https://github.com/aliutkus/torchsearchsorted)
 
