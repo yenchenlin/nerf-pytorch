@@ -1,9 +1,27 @@
 # NeRF-pytorch
 
-## Setup
-- `pip install ipdb configargparse imageio matplotlib imageio-ffmpeg`
-- `pip install torch`
-- Install [torchsearchsorted](https://github.com/aliutkus/torchsearchsorted)
+A faithful PyTorch implementation of [NeRF](http://www.matthewtancik.com/nerf) that **reproduces** the results while running **1.3 times faster**. This repository is based on authors' Tensorflow implementation [here](https://github.com/bmild/nerf).
+
+## Dependencies:
+
+- PyTorch 1.4
+- matplotlib
+- numpy
+- imageio
+- imageio-ffmpeg
+- configargparse
+
+The LLFF data loader requires ImageMagick.
+
+You will also need the [LLFF code](http://github.com/fyusion/llff) (and COLMAP) set up to compute poses if you want to run on your own real data.
+
+## Installation
+
+```
+git clone https://github.com/yenchenlin/nerf-pytorch.git
+cd nerf-pytorch
+python setup.py install
+```
 
 ## Run
 To optimize a low-res Fern NeRF:
@@ -11,50 +29,27 @@ To optimize a low-res Fern NeRF:
 python run_nerf_torch.py --config config_fern.txt
 ```
 
-## Test
+After 200k iterations on a single 2080 Ti (about 8 hours)
+
+## Method
+<img src='imgs/pipeline.jpg'/>
+
+A neural radiance field is a simple fully connected network (weights are ~5MB) trained to reproduce input views of a single scene using a rendering loss. The network directly maps from spatial location and viewing direction (5D input) to color and opacity (4D output), acting as the "volume" so we can use volume rendering to differentiably render new views.
+
+Optimizing a NeRF takes between a few hours and a day or two (depending on resolution) and only requires a single GPU. Rendering an image from an optimized NeRF takes somewhere between less than a second and ~30 seconds, again depending on resolution.
+
+## Reproducing 
+
+To make sure the implementation matches the official implementation, one can:
+
 ```
+git checkout reproduce
 py.test
 ```
 
 ---
 
-# NeRF: Neural Radiance Fields
-### [Project](http://tancik.com/nerf) | [Video](https://youtu.be/JuH79E8rdKc) | [Paper](https://arxiv.org/abs/2003.08934)
-[![Open Tiny-NeRF in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/bmild/nerf/blob/master/tiny_nerf.ipynb)<br>
-Tensorflow implementation of optimizing a neural representation for a single scene and rendering new views.<br><br>
-[NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis](http://tancik.com/nerf)  
- [Ben Mildenhall](https://people.eecs.berkeley.edu/~bmild/)\*<sup>1</sup>,
- [Pratul P. Srinivasan](https://people.eecs.berkeley.edu/~pratul/)\*<sup>1</sup>,
- [Matthew Tancik](http://tancik.com/)\*<sup>1</sup>,
- [Jonathan T. Barron](http://jonbarron.info/)<sup>2</sup>,
- [Ravi Ramamoorthi](http://cseweb.ucsd.edu/~ravir/)<sup>3</sup>,
- [Ren Ng](https://www2.eecs.berkeley.edu/Faculty/Homepages/yirenng.html)<sup>1</sup> <br>
- <sup>1</sup>UC Berkeley, <sup>2</sup>Google Research, <sup>3</sup>UC San Diego  
-  \*denotes equal contribution  
 
-
-<img src='imgs/pipeline.jpg'/>
-
-
-## Setup
-
-Python 3 dependencies:
-
-* Tensorflow 1.15
-* matplotlib
-* numpy
-* imageio
-* configargparse
-
-The LLFF data loader requires ImageMagick.
-
-You will also need the [LLFF code](http://github.com/fyusion/llff) (and COLMAP) set up to compute poses if you want to run on your own real data.
-
-## What is a NeRF?
-
-A neural radiance field is a simple fully connected network (weights are ~5MB) trained to reproduce input views of a single scene using a rendering loss. The network directly maps from spatial location and viewing direction (5D input) to color and opacity (4D output), acting as the "volume" so we can use volume rendering to differentiably render new views.
-
-Optimizing a NeRF takes between a few hours and a day or two (depending on resolution) and only requires a single GPU. Rendering an image from an optimized NeRF takes somewhere between less than a second and ~30 seconds, again depending on resolution.
 
 
 ## Running code
