@@ -513,7 +513,9 @@ def train():
     render_kwargs_train.update(bds_dict)
     render_kwargs_test.update(bds_dict)
     
-    
+    # Move testing data to GPU
+    render_poses = torch.Tensor(render_poses).to(device)
+    print(render_poses[:10])
     # Short circuit if only rendering out from trained model
     if args.render_only:
         print('RENDER ONLY')
@@ -577,8 +579,8 @@ def train():
         render_kwargs_train['network_fn'].to(device)
         render_kwargs_train['network_fine'].to(device)
 
+    # Move training data to GPU
     rays_rgb = torch.Tensor(rays_rgb).to(device)
-    render_poses = torch.Tensor(render_poses).to(device)
 
     for i in range(start, N_iters):
         time0 = time.time()
@@ -678,8 +680,8 @@ def train():
         """
         if i%args.i_video==0: # and i > 0:
             # Turn on testing mode
-            models['model'].eval()
-            models['model_fine'].eval()
+            render_kwargs_test['network_fn'].eval()
+            render_kwargs_test['network_fine'].eval()
 
             rgbs, disps = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
             print('Done, saving', rgbs.shape, disps.shape)
