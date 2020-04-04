@@ -4,7 +4,7 @@ import numpy as np
 import imageio 
 import json
 import torch.nn.functional as F
-import tensorflow as tf
+import cv2
 
 
 trans_t = lambda t : torch.Tensor([
@@ -75,11 +75,16 @@ def load_blender_data(basedir, half_res=False, testskip=1):
     render_poses = torch.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180,180,40+1)[:-1]], 0)
     
     if half_res:
-        imgs = F.interpolate(torch.Tensor(imgs), size=[400, 400], mode='area').numpy()
-        # imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
         H = H//2
         W = W//2
         focal = focal/2.
+
+        imgs_half_res = np.zeros((imgs.shape[0], H, W, 4))
+        for i, img in enumerate(imgs):
+            imgs_half_res[i] = cv2.resize(img, (H, W), interpolation=cv2.INTER_AREA)
+        imgs = imgs_half_res
+        # imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
+
         
     return imgs, poses, render_poses, [H, W, focal], i_split
 
