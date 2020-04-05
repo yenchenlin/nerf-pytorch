@@ -563,6 +563,8 @@ def train():
         rays_rgb = rays_rgb.astype(np.float32)
         print('shuffle rays')
 
+        if DEBUG:
+            np.random.seed(0)
         np.random.shuffle(rays_rgb)
 
         print('done')
@@ -609,6 +611,8 @@ def train():
             
         else:
             # Random from one image
+            if DEBUG:
+                np.random.seed(0)
             img_i = np.random.choice(i_train)
             target = images[img_i]
             pose = poses[img_i, :3,:4]
@@ -617,6 +621,8 @@ def train():
                 rays_o, rays_d = get_rays(H, W, focal, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
                 coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
                 coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
+                if DEBUG:
+                    np.random.seed(0)
                 select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
                 select_coords = coords[select_inds].long()  # (N_rand, 2)
                 rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
@@ -660,10 +666,10 @@ def train():
 
         dt = time.time()-time0
         print(f"Step: {global_step}, Loss: {loss}, Time: {dt}")
-        
         #####           end            #####
         
         if DEBUG:
+            global_step += 1
             continue
         
         # Rest is logging    

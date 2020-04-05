@@ -606,6 +606,8 @@ def train():
         rays_rgb = rays_rgb.astype(np.float32)
         
         print('shuffle rays')
+        if DEBUG:
+            np.random.seed(0)
         np.random.shuffle(rays_rgb)
 
         print('done')
@@ -644,6 +646,8 @@ def train():
             
         else:
             # Random from one image
+            if DEBUG:
+                np.random.seed(0)
             img_i = np.random.choice(i_train)
             target = images[img_i]
             pose = poses[img_i, :3,:4]
@@ -652,6 +656,8 @@ def train():
                 rays_o, rays_d = get_rays(H, W, focal, pose)
                 coords = tf.stack(tf.meshgrid(tf.range(H), tf.range(W), indexing='ij'), -1)
                 coords = tf.reshape(coords, [-1,2])
+                if DEBUG:
+                    np.random.seed(0)
                 select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)
                 select_inds = tf.gather_nd(coords, select_inds[:,tf.newaxis])
                 rays_o = tf.gather_nd(rays_o, select_inds)
