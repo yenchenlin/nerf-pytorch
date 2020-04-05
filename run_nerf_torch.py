@@ -350,7 +350,7 @@ def render_rays(ray_batch,
         ret['z_std'] = torch.std(z_samples, dim=-1, unbiased=False)  # [N_rays]
 
     for k in ret:
-        if torch.isnan(ret[k]).any() or torch.isinf(ret[k]).any():
+        if (torch.isnan(ret[k]).any() or torch.isinf(ret[k]).any()) and DEBUG:
             print(f"! [Numerical Error] {k} contains nan or inf.")
 
     return ret
