@@ -445,8 +445,9 @@ def train():
 
         print('DEFINING BOUNDS')
         if args.no_ndc:
-            near = torch.min(bds) * .9
-            far = torch.max(bds) * 1.
+            near = np.ndarray.min(bds) * .9
+            far = np.ndarray.max(bds) * 1.
+            
         else:
             near = 0.
             far = 1.
