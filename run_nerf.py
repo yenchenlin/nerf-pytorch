@@ -804,7 +804,7 @@ def train():
 
 
     
-        if i%args.i_print==0 or i < 10:
+        if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
         """
             print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
