@@ -88,7 +88,7 @@ To play with other scenes presented in the paper, download the data [here](https
 To train NeRF on different datasets: 
 
 ```
-python run_nerf.py --config configs/config_{DATASET}.txt
+python run_nerf.py --config configs/{DATASET}.txt
 ```
 
 replace `{DATASET}` with `trex` | `horns` | `flower` | `fortress` | `lego` | etc.
@@ -98,7 +98,7 @@ replace `{DATASET}` with `trex` | `horns` | `flower` | `fortress` | `lego` | etc
 To test NeRF trained on different datasets: 
 
 ```
-python run_nerf.py --config configs/config_{DATASET}.txt --render_only
+python run_nerf.py --config configs/{DATASET}.txt --render_only
 ```
 
 replace `{DATASET}` with `trex` | `horns` | `flower` | `fortress` | `lego` | etc.
