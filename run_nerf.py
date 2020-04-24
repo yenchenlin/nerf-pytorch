@@ -224,7 +224,7 @@ def create_nerf(args):
         print('Reloading from', ckpt_path)
         ckpt = torch.load(ckpt_path)
 
-        start = ckpt['global_step'] + 1
+        start = ckpt['global_step']
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
 
         # Load model
@@ -687,7 +687,8 @@ def train():
 
     # Summary writers
     # writer = SummaryWriter(os.path.join(basedir, 'summaries', expname))
-
+    
+    start = start + 1
     for i in trange(start, N_iters):
         time0 = time.time()
 
