@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
+import trimesh
+import mcubes
 
 import matplotlib.pyplot as plt
 
@@ -17,7 +19,6 @@ from run_nerf_helpers import *
 from load_llff import load_llff_data
 from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
@@ -133,6 +134,26 @@ def render(H, W, focal, chunk=1024*32, rays=None, c2w=None, ndc=True,
     ret_dict = {k : all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
 
+
+def extract_mesh(render_kwargs, mesh_grid_size=80, threshold=50):
+    network_query_fn, network = render_kwargs['network_query_fn'], render_kwargs['network_fine']
+    device = next(network.parameters()).device
+
+    with torch.no_grad():
+        points = np.linspace(-1, 1, mesh_grid_size)
+        query_pts = torch.tensor(np.stack(np.meshgrid(points, points, points), -1).astype(np.float32)).reshape(-1, 1, 3).to(device)
+        viewdirs = torch.zeros(query_pts.shape[0], 3).to(device)
+
+        output = network_query_fn(query_pts, viewdirs, network)
+
+        grid = output[...,-1].reshape(mesh_grid_size, mesh_grid_size, mesh_grid_size)
+
+        print('fraction occupied:', (grid > threshold).float().mean())
+
+        vertices, triangles = mcubes.marching_cubes(grid.detach().cpu().numpy(), threshold)
+        mesh = trimesh.Trimesh(vertices, triangles)
+
+    return mesh
 
 def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
 
@@ -482,6 +503,12 @@ def config_parser():
     parser.add_argument("--render_factor", type=int, default=0, 
                         help='downsampling factor to speed up rendering, set 4 or 8 for fast preview')
 
+    # mesh options
+    parser.add_argument("--mesh_only", action='store_true', 
+                        help='do not optimize, reload weights and save mesh to a file')
+    parser.add_argument("--mesh_grid_size", type=int, default=80,
+                        help='number of grid points to sample in each dimension for marching cubes')
+
     # training options
     parser.add_argument("--precrop_iters", type=int, default=0,
                         help='number of steps to train on central crops')
@@ -652,6 +679,20 @@ def train():
             imageio.mimwrite(os.path.join(testsavedir, 'video.mp4'), to8b(rgbs), fps=30, quality=8)
 
             return
+
+    # Short circuit if only extracting mesh from trained model
+    if args.mesh_only:
+        mesh = extract_mesh(render_kwargs_test, mesh_grid_size=args.mesh_grid_size, threshold=50)
+
+        testsavedir = os.path.join(basedir, expname, 'renderonly_{}_{:06d}'.format('test' if args.render_test else 'path', start))
+        os.makedirs(testsavedir, exist_ok=True)
+        path = os.path.join(testsavedir, 'mesh.obj')
+
+        print("saving mesh to ", path)
+
+        mesh.export(path)
+
+        return
 
     # Prepare raybatch tensor if batching random rays
     N_rand = args.N_rand
