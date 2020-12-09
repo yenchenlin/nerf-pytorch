@@ -157,7 +157,7 @@ However, if you find this implementation or pre-trained models helpful, please c
 ```
 @software{pytorchnerf2020github,
   author = {Yen-Chen, Lin},
-  title = {{PytorchNeRF}: a {Pytorch} implementation of {NeRF}},
+  title = {{PyTorchNeRF}: a {PyTorch} implementation of {NeRF}},
   url = {https://github.com/yenchenlin/nerf-pytorch/},
   version = {0.0},
   year = {2020},
