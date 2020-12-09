@@ -155,7 +155,7 @@ Kudos to the authors for their amazing results:
 
 However, if you find this implementation or pre-trained models helpful, please consider to cite:
 ```
-@software{jaxnerf2020github,
+@software{pytorchnerf2020github,
   author = {Yen-Chen, Lin},
   title = {{PytorchNeRF}: a {Pytorch} implementation of {NeRF}},
   url = {https://github.com/yenchenlin/nerf-pytorch/},
