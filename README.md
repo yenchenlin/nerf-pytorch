@@ -155,10 +155,11 @@ Kudos to the authors for their amazing results:
 
 However, if you find this implementation or pre-trained models helpful, please consider to cite:
 ```
-@misc{lin2020nerfpytorch,
-  title={NeRF-pytorch},
-  author={Yen-Chen, Lin},
-  howpublished={\url{https://github.com/yenchenlin/nerf-pytorch/}},
-  year={2020}
+@software{jaxnerf2020github,
+  author = {Yen-Chen, Lin},
+  title = {{PytorchNeRF}: a {Pytorch} implementation of {NeRF}},
+  url = {https://github.com/yenchenlin/nerf-pytorch/},
+  version = {0.0},
+  year = {2020},
 }
 ```
