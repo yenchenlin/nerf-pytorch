@@ -49,6 +49,11 @@ To train a low-res `lego` NeRF:
 ```
 python run_nerf.py --config configs/lego.txt
 ```
+
+To use multi-GPU, add `CUDA_VISIBLE_DEVICES=<GPU_ID>` before the command. For example:
+```
+CUDA_VISIBLE_DEVICES=0,1 python run_nerf.py --config configs/lego.txt
+```
 After training for 100k iterations (~4 hours on a single 2080 Ti), you can find the following video at `logs/lego_test/lego_test_spiral_100000_rgb.mp4`.
 
 ![](https://user-images.githubusercontent.com/7057863/78473103-9353b300-7770-11ea-98ed-6ba2d877b62c.gif)
