@@ -160,11 +160,10 @@ Kudos to the authors for their amazing results:
 
 However, if you find this implementation or pre-trained models helpful, please consider to cite:
 ```
-@software{pytorchnerf2020github,
+@misc{Yen-Chen20github_{PyTorchNeRF},
   author = {Yen-Chen, Lin},
   title = {{PyTorchNeRF}: a {PyTorch} implementation of {NeRF}},
   url = {https://github.com/yenchenlin/nerf-pytorch/},
-  version = {0.0},
   year = {2020},
 }
 ```
