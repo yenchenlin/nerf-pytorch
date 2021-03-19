@@ -14,9 +14,6 @@ This project is a faithful PyTorch implementation of [NeRF](http://www.matthewta
 git clone https://github.com/yenchenlin/nerf-pytorch.git
 cd nerf-pytorch
 pip install -r requirements.txt
-cd torchsearchsorted
-pip install .
-cd ../
 ```
 
 <details>
