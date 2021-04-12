@@ -4,6 +4,6 @@ imageio
 imageio-ffmpeg
 matplotlib
 configargparse
-tensorboard==1.14.0
+tensorboard==1.15.0
 tqdm
 opencv-python
