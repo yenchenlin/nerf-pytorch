@@ -1,9 +1,9 @@
-torch>=1.4.0
-torchvision>=0.2.1
+torch>=1.8
+torchvision>=0.9.1
 imageio
 imageio-ffmpeg
 matplotlib
 configargparse
-tensorboard==1.14.0
+tensorboard>=2.0
 tqdm
 opencv-python
