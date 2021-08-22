@@ -182,11 +182,13 @@ def recenter_poses(poses):
 
 
 def spherify_poses(poses, bds):
-    
-    p34_to_44 = lambda p : np.concatenate([p, np.tile(np.reshape(np.eye(4)[-1,:], [1,1,4]), [p.shape[0], 1,1])], 1)
-    
-    rays_d = poses[:,:3,2:3]
-    rays_o = poses[:,:3,3:4]
+    # A function that pads transformation matrices of shape (B, 3, 4) into (B, 4, 4).
+    p34_to_44 = lambda p : np.concatenate([
+        p, 
+        np.tile(np.reshape(np.eye(4)[-1,:], [1,1,4]), [p.shape[0], 1,1])
+    ], 1)
+    rays_d = poses[:,:3,2:3]  # camera's z direction.
+    rays_o = poses[:,:3,3:4]  # camera's location.
 
     def min_line_dist(rays_o, rays_d):
         A_i = np.eye(3) - rays_d * np.transpose(rays_d, [0,2,1])
@@ -195,25 +197,19 @@ def spherify_poses(poses, bds):
         return pt_mindist
 
     pt_mindist = min_line_dist(rays_o, rays_d)
-    
     center = pt_mindist
     up = (poses[:,:3,3] - center).mean(0)
-
     vec0 = normalize(up)
     vec1 = normalize(np.cross([.1,.2,.3], vec0))
     vec2 = normalize(np.cross(vec0, vec1))
     pos = center
     c2w = np.stack([vec1, vec2, vec0, pos], 1)
-
     poses_reset = np.linalg.inv(p34_to_44(c2w[None])) @ p34_to_44(poses[:,:3,:4])
-
     rad = np.sqrt(np.mean(np.sum(np.square(poses_reset[:,:3,3]), -1)))
-    
     sc = 1./rad
     poses_reset[:,:3,3] *= sc
     bds *= sc
     rad *= sc
-    
     centroid = np.mean(poses_reset[:,:3,3], 0)
     zh = centroid[2]
     radcircle = np.sqrt(rad**2-zh**2)
