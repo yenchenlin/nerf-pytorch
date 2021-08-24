@@ -191,6 +191,11 @@ def spherify_poses(poses, bds):
     rays_o = poses[:,:3,3:4]  # camera's location.
 
     def min_line_dist(rays_o, rays_d):
+        """ Takes a set of lines and returns the point nearest to 
+            all the lines in the least squares sense.
+
+            Reference: https://math.stackexchange.com/a/1762491
+        """
         A_i = np.eye(3) - rays_d * np.transpose(rays_d, [0,2,1])
         b_i = -A_i @ rays_o
         pt_mindist = np.squeeze(-np.linalg.inv((np.transpose(A_i, [0,2,1]) @ A_i).mean(0)) @ (b_i).mean(0))

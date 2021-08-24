@@ -1,0 +1,21 @@
+expname = strainer-360
+basedir = ./logs
+datadir = ./data/strainer-360
+dataset_type = llff
+
+factor = 4
+llffhold = 8
+
+N_rand = 1024
+N_samples = 64
+N_importance = 64
+
+use_viewdirs = True
+raw_noise_std = 1e0
+
+spherify = True
+no_ndc = True
+lindisp = True
+
+i_testset = 10000
+i_video = 10000
