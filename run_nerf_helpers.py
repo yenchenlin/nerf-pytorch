@@ -1,5 +1,5 @@
 import torch
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
