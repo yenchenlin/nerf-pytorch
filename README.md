@@ -103,7 +103,7 @@ replace `{DATASET}` with `trex` | `horns` | `flower` | `fortress` | `lego` | etc
 
 ### Pre-trained Models
 
-You can download the pre-trained models [here](https://drive.google.com/drive/folders/1uq0OSpyCuSIOBbT12L3pLiEnMoKIwMDo). Place the downloaded directory in `./logs` in order to test it later. See the following directory structure for an example:
+You can download the pre-trained models [here](https://drive.google.com/drive/folders/1jIr8dkvefrQmv737fFm2isiT6tqpbTbv). Place the downloaded directory in `./logs` in order to test it later. See the following directory structure for an example:
 
 ```
 ├── logs 
