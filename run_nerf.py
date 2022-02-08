@@ -18,8 +18,14 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
+gpu = 0
+# change your GPU here: 0, 1, or ...
+if torch.cuda.is_available():
+    device = torch.device("cuda:" + str(gpu))
+    torch.cuda.set_device(gpu)
+else:
+    device = torch.device("cpu")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
 
