@@ -18,6 +18,13 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
+try:
+    import wandb
+
+    assert hasattr(wandb, '__version__')  # verify package import not local dir
+except (ImportError, AssertionError):
+    wandb = None
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
@@ -528,6 +535,11 @@ def config_parser():
     parser.add_argument("--i_video",   type=int, default=50000, 
                         help='frequency of render_poses video saving')
 
+    # Weights and Biases flags
+    parser.add_argument("--use_wandb", default=True, type = bool, help = "Whether to use W&B for metric logging")
+    parser.add_argument("--wandb_project", default="nerf-pytorch", type=str, help="Name of the W&B Project")
+    parser.add_argument("--wandb_entity", default=None, type=str, help="entity to use for W&B logging")
+
     return parser
 
 
@@ -535,6 +547,9 @@ def train():
 
     parser = config_parser()
     args = parser.parse_args()
+
+    if args.use_wandb:
+        wandb.init(project=args.wandb_project, entity=args.wandb_entity, config=args)
 
     # Load data
     K = None
@@ -827,6 +842,9 @@ def train():
     
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
+
+            if args.use_wandb:
+                wandb.log({"Training Loss": loss.item(), "PSNR": psnr.item()})
         """
             print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
             print('iter time {:.05f}'.format(dt))
