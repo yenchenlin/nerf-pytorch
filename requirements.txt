@@ -1,4 +1,4 @@
-torch>=1.8
+torch==1.11.0
 torchvision>=0.9.1
 imageio
 imageio-ffmpeg
