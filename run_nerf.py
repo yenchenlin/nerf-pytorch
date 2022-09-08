@@ -525,7 +525,7 @@ def config_parser():
                         help='frequency of weight ckpt saving')
     parser.add_argument("--i_testset", type=int, default=50000, 
                         help='frequency of testset saving')
-    parser.add_argument("--i_video",   type=int, default=50000, 
+    parser.add_argument("--i_video",   type=int, default=50000,
                         help='frequency of render_poses video saving')
 
     return parser
@@ -803,10 +803,21 @@ def train():
             # Turn on testing mode
             with torch.no_grad():
                 rgbs, disps = render_path(render_poses, hwf, K, args.chunk, render_kwargs_test)
+                rgbs_render, disps_render = render_path(poses, hwf, K, args.chunk, render_kwargs_test)
             print('Done, saving', rgbs.shape, disps.shape)
             moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
             imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.nanmax(disps)), fps=30, quality=8)
+
+            photodir = os.path.join(basedir, expname, 'rendered images')
+            os.makedirs(photodir, exist_ok=True)
+            photobase = os.path.join(photodir, '{}_{:06d}'.format(expname, i))
+            os.makedirs('{}/rgbs'.format(photobase), exist_ok=True)
+            os.makedirs('{}/disp'.format(photobase), exist_ok=True)
+            for index in range(len(rgbs_render)):
+                imageio.imwrite(photobase + '/rgbs/{:04d}'.format(index+7) + '.jpg', to8b(rgbs_render[index]))
+                imageio.imwrite(photobase + '/disp/{:04d}'.format(index+7) + '.jpg', to8b(disps_render[index] / np.nanmax(disps_render)))
+
 
             # if args.use_viewdirs:
             #     render_kwargs_test['c2w_staticcam'] = render_poses[0][:3,:4]
