@@ -8,3 +8,4 @@
 data/*
 logs/*
 !/images/*
+/nerf_example_data/*

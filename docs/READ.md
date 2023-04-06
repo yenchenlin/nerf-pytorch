@@ -1,9 +1,9 @@
-![图 1](./images/37d2b1e16366c723f6c06a57747980ef0d5f839a22cb4f5a0bbbcc5ab5f2cb56.png)  
+![图 1](../images/37d2b1e16366c723f6c06a57747980ef0d5f839a22cb4f5a0bbbcc5ab5f2cb56.png)  
 
 - focal length 是在world units？
 - N是什么意思？batch?
 - principal point是什么？
-- K是标定矩阵?
+- K是标定矩阵?相机的内参？
 - NDC space是什么？screen space是什么？
 
 数据集：
