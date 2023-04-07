@@ -135,6 +135,13 @@ embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed)
 ```
 
 ### MLP
+
+首先 NeRF 将场景用 MLP 表示，使用坐标 $\boldsymbol{x}$ 推测出密度 $\sigma$ 和中间特征，然后用这个中间特征 $\boldsymbol{e}$ 和视角 $\boldsymbol{d}$ 推测出这个点的颜色 $\boldsymbol{c}$，下面将这两个过程分开写，其实就是 NeRF 中的网络：
+
+$$
+\begin{aligned} (\sigma, \boldsymbol{e}) &=\operatorname{MLP}^{(\mathrm{pos})}(\boldsymbol{x}), \\ \boldsymbol{c} &=\operatorname{MLP}^{(\mathrm{rgb})}(\boldsymbol{e}, \boldsymbol{d}) \end{aligned}\\
+$$
+
 ![图 2](../images/093cbe95a5eabf5685a649913018b32ba5f5b14493e704cba43cca7aaa8b7cfb.png)  
 
 
@@ -235,6 +242,33 @@ pose = poses[img_i, :3,:4]
 
 ## render
 
+> 原文：
+
+$\sigma_i$表示光线上某处点的密度，$T_i$表示前面粒子的遮挡下的透射率。
+
+$$
+\begin{aligned} 
+\hat{C}(\boldsymbol{r}) &=\sum_{i=1}^N T_i (1-\exp(-\sigma_i\delta_i)) \boldsymbol{c}_i, 
+\\ T_i &=\exp{\left(-\sum_{j=1}^{i-1}{\sigma_i\delta_i} \right)},
+\\ \operatorname{where} \delta_i &= t_{i+1} - t_i
+\end{aligned}
+$$
+
+> 转化成不透明度的角度就好理解了
+
+$\alpha$表示不透明度，$T_i$透射率就是前面粒子的不透明率的残余相乘，或者说透明度透过的光线相乘，很直观地符合图像里的Alpha Blending。
+
+$$
+\begin{aligned} 
+\hat{C}(\boldsymbol{r}) &=\sum_{i=1}^N T_i \alpha_i \boldsymbol{c}_i, 
+\\ \alpha_i &=\operatorname{alpha}\left(\sigma_i, \delta_i\right)=1-\exp \left(-\sigma_i \delta_i\right), 
+\\ T_i &=\prod_{j=1}^{i-1}\left(1-\alpha_j\right) 
+\end{aligned}
+$$
+
+![图 1](../images/2ffc51527299c38302924a74d5bbf66a39051bef35738e98adb30aac09d15218.png)  
+
+
 ```python
 def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
                   near=0., far=1.,
@@ -244,3 +278,11 @@ rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, rays=batch_rays,
                                                 verbose=i < 10, retraw=True,
                                                 **render_kwargs_train)
 ```
+
+# 问题
+
+图像上一个点对应一条光线还是多条光线的平均？也就是说，图像像素个数和光线个数一致吗？
+好像是的。为了渲染一幅1920x1280的图片，需要1920x1280条光线，每条光线(128+64)个粗和线的采样，即MLP需要做1920x1280x(128+64)查询。
+
+
+以一个像素点 $P(u,v)$为例讲解：从该点发出的射线在世界坐标系中的表示为： $R^{-1}*K^{-1}(u,v,1)^{T}$， c2w = (R, t)
