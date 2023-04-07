@@ -27,3 +27,6 @@ def normalize(x):
     return x / np.linalg.norm(x)
 
 这归一化有什么意义？
+
+
+

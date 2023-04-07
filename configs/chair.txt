@@ -1,6 +1,6 @@
 expname = blender_paper_chair
 basedir = ./logs
-datadir = ./data/nerf_synthetic/chair
+datadir = /home/sword/git/Dataset/nerf_synthetic/chair
 dataset_type = blender
 
 no_batching = True
