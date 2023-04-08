@@ -63,12 +63,12 @@ focal = .5 * W / np.tan(.5 * camera_angle_x)
 
 # (40, 4, 4)
 render_poses = torch.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180,180,40+1)[:-1]], 0)
-
 ```
 # run_nerf.py
 
 `train()`
 
+[alpha blending](https://zhuanlan.zhihu.com/p/613427468)
 ```python
 if args.white_bkgd:
     images = images[...,:3]*images[...,-1:] + (1.-images[...,-1:])
@@ -234,7 +234,7 @@ class NeRF(nn.Module):
 ```
 
 
-```
+```python
 # 因为最后一行都是`[0, 0, 0, 1]`
 pose = poses[img_i, :3,:4]
 ```

@@ -3,7 +3,6 @@
 - focal length 是在world units？
 - N是什么意思？batch?
 - principal point是什么？
-- K是标定矩阵?相机的内参？
 - NDC space是什么？screen space是什么？
 
 数据集：
