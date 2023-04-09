@@ -18,6 +18,8 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
+import tensorboard 
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
@@ -72,11 +74,7 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
                   **kwargs):
     """Render rays
     Args:
-      H: int. Height of image in pixels.
-      W: int. Width of image in pixels.
-      focal: float. Focal length of pinhole camera.
-      chunk: int. Maximum number of rays to process simultaneously. Used to
-        control maximum memory usage. Does not affect final results.
+      H: int. Height of image in pixels.import tensorboardot affect final results.
       rays: array of shape [2, batch_size, 3]. Ray origin and direction for
         each example in batch.
       c2w: array of shape [3, 4]. Camera-to-world transformation matrix.
@@ -705,7 +703,7 @@ def train():
     print('VAL views are', i_val)
 
     # Summary writers
-    # writer = SummaryWriter(os.path.join(basedir, 'summaries', expname))
+    writer = tensorboard.SummaryWriter(os.path.join(basedir, 'summaries', expname))
     
     start = start + 1
     for i in trange(start, N_iters):
@@ -827,6 +825,8 @@ def train():
     
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
+            writer.add_scalar("Train/Loss", loss.item(), i)
+            writer.add_scalar("Train/PSNR", psnr.item(), i)
         """
             print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
             print('iter time {:.05f}'.format(dt))
