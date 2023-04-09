@@ -18,7 +18,7 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
-import tensorboard 
+from torch.utils.tensorboard import SummaryWriter
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -74,7 +74,11 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
                   **kwargs):
     """Render rays
     Args:
-      H: int. Height of image in pixels.import tensorboardot affect final results.
+      H: int. Height of image in pixels.
+      W: int. Width of image in pixels.
+      focal: float. Focal length of pinhole camera.
+      chunk: int. Maximum number of rays to process simultaneously. Used to
+        control maximum memory usage. Does not affect final results.
       rays: array of shape [2, batch_size, 3]. Ray origin and direction for
         each example in batch.
       c2w: array of shape [3, 4]. Camera-to-world transformation matrix.
@@ -465,7 +469,7 @@ def config_parser():
     parser.add_argument("--use_viewdirs", action='store_true', 
                         help='use full 5D input instead of 3D')
     parser.add_argument("--i_embed", type=int, default=0, 
-                        help='set 0 for default positional encoding, -1 for none')
+                        help='set 0 for default positional encoding, -1 for none, 2 for multivariable fourier')
     parser.add_argument("--multires", type=int, default=10, 
                         help='log2 of max freq for positional encoding (3D location)')
     parser.add_argument("--multires_views", type=int, default=4, 
@@ -703,7 +707,7 @@ def train():
     print('VAL views are', i_val)
 
     # Summary writers
-    writer = tensorboard.SummaryWriter(os.path.join(basedir, 'summaries', expname))
+    writer = SummaryWriter(os.path.join(basedir, 'summaries', expname, 'mf_shallow'))
     
     start = start + 1
     for i in trange(start, N_iters):

@@ -19,11 +19,17 @@ class Embedder:
         
     def create_embedding_fn(self):
         embed_fns = []
+        # Multivariable Fourier Basis
+        embed_mffns = []
+
         d = self.kwargs['input_dims']
         out_dim = 0
+        out_mf_dim = 0
         if self.kwargs['include_input']:
             embed_fns.append(lambda x : x)
+            embed_mffns.append(lambda x : x)
             out_dim += d
+            out_mf_dim += d
             
         max_freq = self.kwargs['max_freq_log2']
         N_freqs = self.kwargs['num_freqs']
@@ -37,12 +43,33 @@ class Embedder:
             for p_fn in self.kwargs['periodic_fns']:
                 embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
                 out_dim += d
+
+        # Multivariable Fourier Basis
+        for freq_x in freq_bands:
+            for freq_y in freq_bands:
+                for freq_z in freq_bands:
+                    for p_fn in self.kwargs['periodic_fns']:
+                        embed_mffns.append(lambda x, p_fn=p_fn, freq_x=freq_x, freq_y=freq_y,
+                        freq_z=freq_z : p_fn(x[:, 0:1] * freq_x + x[:, 1:2] * freq_y + x[:, 2:3] * freq_z))
+                        out_mf_dim += 1
                     
         self.embed_fns = embed_fns
+        self.embed_mffns = embed_mffns
         self.out_dim = out_dim
+        self.out_mf_dim = out_mf_dim
         
     def embed(self, inputs):
         return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
+
+    def embed_mf(self, inputs):
+        # Debug
+        # fns = [fn(inputs) for fn in self.embed_fns]
+        # mffns = [fn(inputs) for fn in self.embed_mffns]
+        # print("fns", torch.cat(fns, -1).shape)
+        # print("out_dim", self.out_dim)
+        # print("mffns", torch.cat(mffns, -1).shape)
+        # print("out_mf_dim", self.out_mf_dim)
+        return torch.cat([fn(inputs) for fn in self.embed_mffns], -1)
 
 
 def get_embedder(multires, i=0):
@@ -59,6 +86,12 @@ def get_embedder(multires, i=0):
     }
     
     embedder_obj = Embedder(**embed_kwargs)
+
+    # Multivariable Fourier Basis
+    if i == 2:
+        embed = lambda x, eo=embedder_obj : eo.embed_mf(x)
+        return embed, embedder_obj.out_mf_dim
+
     embed = lambda x, eo=embedder_obj : eo.embed(x)
     return embed, embedder_obj.out_dim
 
