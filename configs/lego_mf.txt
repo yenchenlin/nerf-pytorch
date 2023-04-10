@@ -19,4 +19,3 @@ precrop_frac = 0.5
 half_res = True
 
 i_embed = 2
-netdepth = 2

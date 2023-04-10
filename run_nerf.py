@@ -19,6 +19,7 @@ from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
 from torch.utils.tensorboard import SummaryWriter
+from torchstat import stat
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -652,6 +653,10 @@ def train():
     # Move testing data to GPU
     render_poses = torch.Tensor(render_poses).to(device)
 
+    # Check model size
+    # stat(render_kwargs_train['network_fn'], (65536, 2003))
+    # stat(render_kwargs_train['network_fine'], (65536, 2003))
+
     # Short circuit if only rendering out from trained model
     if args.render_only:
         print('RENDER ONLY')
@@ -707,7 +712,7 @@ def train():
     print('VAL views are', i_val)
 
     # Summary writers
-    writer = SummaryWriter(os.path.join(basedir, 'summaries', expname, 'mf_shallow'))
+    writer = SummaryWriter(os.path.join(basedir, 'summaries', expname, 'base'))
     
     start = start + 1
     for i in trange(start, N_iters):

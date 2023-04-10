@@ -3,7 +3,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import itertools
 
+
+DEBUG = False
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Misc
 img2mse = lambda x, y : torch.mean((x - y) ** 2)
@@ -13,6 +17,21 @@ to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
 # Positional encoding (section 5.1)
 class Embedder:
+    def spherical_features(sqrt_dim=10, rand=True):
+        if rand:  # Random
+            # np.random.seed(0)  # generate consistant random feature
+            u, v = np.random.rand(2, sqrt_dim ** 2)
+        else:  # Stratified
+            segs = np.linspace(0, 1, sqrt_dim)
+            u, v = np.array(list(itertools.product(segs, segs))).transpose()
+        # Spherical sampling
+        i = 2 * np.pi * u
+        j = np.arccos(1 - 2 * v)
+        x = np.sin(j) * np.cos(i)
+        y = np.sin(j) * np.sin(i)
+        z = np.cos(j)
+        return torch.from_numpy(np.stack((x, y, z)).transpose()).to(device)
+
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.create_embedding_fn()
@@ -44,15 +63,25 @@ class Embedder:
                 embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
                 out_dim += d
 
-        # Multivariable Fourier Basis
-        for freq_x in freq_bands:
-            for freq_y in freq_bands:
-                for freq_z in freq_bands:
-                    for p_fn in self.kwargs['periodic_fns']:
-                        embed_mffns.append(lambda x, p_fn=p_fn, freq_x=freq_x, freq_y=freq_y,
-                        freq_z=freq_z : p_fn(x[:, 0:1] * freq_x + x[:, 1:2] * freq_y + x[:, 2:3] * freq_z))
-                        out_mf_dim += 1
-                    
+        # # Multivariable Fourier Basis
+        # for freq_x in freq_bands:
+        #     for freq_y in freq_bands:
+        #         for freq_z in freq_bands:
+        #             for p_fn in self.kwargs['periodic_fns']:
+        #                 embed_mffns.append(lambda x, p_fn=p_fn, freq_x=freq_x, freq_y=freq_y,
+        #                 freq_z=freq_z : p_fn(x[:, 0:1] * freq_x + x[:, 1:2] * freq_y + x[:, 2:3] * freq_z))
+        #                 out_mf_dim += 1
+        
+        # Spherical Fourier Basis
+        np.random.seed(0)  # generate consistant random feature
+        for freq in freq_bands:
+            for unit_vec in Embedder.spherical_features():
+                for p_fn in self.kwargs['periodic_fns']:
+                    embed_mffns.append(lambda x, p_fn=p_fn, freq=freq, vec=unit_vec :
+                    p_fn(freq * (vec[0] * x[:, 0:1] + vec[1] * x[:, 1:2] + vec[2] * x[:, 2:3])))
+                    out_mf_dim += 1
+
+
         self.embed_fns = embed_fns
         self.embed_mffns = embed_mffns
         self.out_dim = out_dim
@@ -62,13 +91,14 @@ class Embedder:
         return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
 
     def embed_mf(self, inputs):
-        # Debug
-        # fns = [fn(inputs) for fn in self.embed_fns]
-        # mffns = [fn(inputs) for fn in self.embed_mffns]
-        # print("fns", torch.cat(fns, -1).shape)
-        # print("out_dim", self.out_dim)
-        # print("mffns", torch.cat(mffns, -1).shape)
-        # print("out_mf_dim", self.out_mf_dim)
+        if DEBUG:
+            fns = [fn(inputs) for fn in self.embed_fns]
+            mffns = [fn(inputs) for fn in self.embed_mffns]
+            print("fns", torch.cat(fns, -1).shape)
+            print("out_dim", self.out_dim)
+            print("mffns", torch.cat(mffns, -1).shape)
+            print("out_mf_dim", self.out_mf_dim)
+            exit(-1)
         return torch.cat([fn(inputs) for fn in self.embed_mffns], -1)
 
 
