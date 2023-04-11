@@ -244,13 +244,15 @@ pose = poses[img_i, :3,:4]
 
 > 原文：
 
+we typically use quadrature to approximate the integrals, where $\sigma$ and $c_i$ are assumed to be **piecewise-constant** within a set of N intervals ${[t_{i−1},t_i)}^N_{i=1}$ that partition the length of the ray
+
 $\sigma_i$表示光线上某处点的密度，$T_i$表示前面粒子的遮挡下的透射率。
 
 $$
 \begin{aligned} 
 \hat{C}(\boldsymbol{r}) &=\sum_{i=1}^N T_i (1-\exp(-\sigma_i\delta_i)) \boldsymbol{c}_i, 
 \\ T_i &=\exp{\left(-\sum_{j=1}^{i-1}{\sigma_i\delta_i} \right)},
-\\ \operatorname{where} \delta_i &= t_{i+1} - t_i
+\\ \operatorname{where} \delta_i &= t_{i} - t_{i-1}
 \end{aligned}
 $$
 
@@ -263,6 +265,7 @@ $$
 \hat{C}(\boldsymbol{r}) &=\sum_{i=1}^N T_i \alpha_i \boldsymbol{c}_i, 
 \\ \alpha_i &=\operatorname{alpha}\left(\sigma_i, \delta_i\right)=1-\exp \left(-\sigma_i \delta_i\right), 
 \\ T_i &=\prod_{j=1}^{i-1}\left(1-\alpha_j\right) 
+\\ \operatorname{where} \delta_i &= t_{i} - t_{i-1}
 \end{aligned}
 $$
 
