@@ -18,6 +18,9 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
+from torch.utils.tensorboard import SummaryWriter
+from torchstat import stat
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
@@ -467,7 +470,7 @@ def config_parser():
     parser.add_argument("--use_viewdirs", action='store_true', 
                         help='use full 5D input instead of 3D')
     parser.add_argument("--i_embed", type=int, default=0, 
-                        help='set 0 for default positional encoding, -1 for none')
+                        help='set 0 for default positional encoding, -1 for none, 2 for multivariable fourier')
     parser.add_argument("--multires", type=int, default=10, 
                         help='log2 of max freq for positional encoding (3D location)')
     parser.add_argument("--multires_views", type=int, default=4, 
@@ -650,6 +653,10 @@ def train():
     # Move testing data to GPU
     render_poses = torch.Tensor(render_poses).to(device)
 
+    # Check model size
+    # stat(render_kwargs_train['network_fn'], (65536, 2003))
+    # stat(render_kwargs_train['network_fine'], (65536, 2003))
+
     # Short circuit if only rendering out from trained model
     if args.render_only:
         print('RENDER ONLY')
@@ -705,7 +712,7 @@ def train():
     print('VAL views are', i_val)
 
     # Summary writers
-    # writer = SummaryWriter(os.path.join(basedir, 'summaries', expname))
+    writer = SummaryWriter(os.path.join(basedir, 'summaries', expname, 'base'))
     
     start = start + 1
     for i in trange(start, N_iters):
@@ -827,6 +834,8 @@ def train():
     
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
+            writer.add_scalar("Train/Loss", loss.item(), i)
+            writer.add_scalar("Train/PSNR", psnr.item(), i)
         """
             print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
             print('iter time {:.05f}'.format(dt))
