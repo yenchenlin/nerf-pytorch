@@ -1,4 +1,14 @@
-# load_blender.py
+- [1. load\_blender.py](#1-load_blenderpy)
+- [2. run\_nerf.py](#2-run_nerfpy)
+- [3. run\_nerf\_helpers.py](#3-run_nerf_helperspy)
+- [4. run\_nerf.py](#4-run_nerfpy)
+    - [4.0.1. MLP](#401-mlp)
+  - [4.1. train](#41-train)
+  - [4.2. render](#42-render)
+- [5. 问题](#5-问题)
+---
+
+# 1. load_blender.py
 
 
 `load_blender_data()`
@@ -64,7 +74,7 @@ focal = .5 * W / np.tan(.5 * camera_angle_x)
 # (40, 4, 4)
 render_poses = torch.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180,180,40+1)[:-1]], 0)
 ```
-# run_nerf.py
+# 2. run_nerf.py
 
 `train()`
 
@@ -87,7 +97,7 @@ if K is None:
 
 
 
-# run_nerf_helpers.py
+# 3. run_nerf_helpers.py
 
 ```python
 class NeRF(nn.Module):
@@ -102,7 +112,7 @@ class NeRF(nn.Module):
     ):
 ```
 
-# run_nerf.py
+# 4. run_nerf.py
 
 `create_nerf()`
 ```python
@@ -134,7 +144,7 @@ embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed)
 # input_ch = 27， 27 = 1 * 3 + （2 * 4）* 3 = 原本diretion的三维度表示 + （sin, cos 4次）* 3维度
 ```
 
-### MLP
+### 4.0.1. MLP
 
 首先 NeRF 将场景用 MLP 表示，使用坐标 $\boldsymbol{x}$ 推测出密度 $\sigma$ 和中间特征，然后用这个中间特征 $\boldsymbol{e}$ 和视角 $\boldsymbol{d}$ 推测出这个点的颜色 $\boldsymbol{c}$，下面将这两个过程分开写，其实就是 NeRF 中的网络：
 
@@ -225,7 +235,7 @@ class NeRF(nn.Module):
         return outputs    
 ```
 
-## train
+## 4.1. train
 
 ```python
 
@@ -240,7 +250,7 @@ pose = poses[img_i, :3,:4]
 ```
 
 
-## render
+## 4.2. render
 
 > 原文：
 
@@ -251,7 +261,7 @@ $\sigma_i$表示光线上某处点的密度，$T_i$表示前面粒子的遮挡�
 $$
 \begin{aligned} 
 \hat{C}(\boldsymbol{r}) &=\sum_{i=1}^N T_i (1-\exp(-\sigma_i\delta_i)) \boldsymbol{c}_i, 
-\\ T_i &=\exp{\left(-\sum_{j=1}^{i-1}{\sigma_i\delta_i} \right)},
+\\ T_i &=\exp{\left(-\sum_{j=1}^{i-1}{\sigma_j\delta_j} \right)},
 \\ \operatorname{where} \delta_i &= t_{i} - t_{i-1}
 \end{aligned}
 $$
@@ -269,6 +279,9 @@ $$
 \end{aligned}
 $$
 
+![图 1](../images/3c507798d267321eb2e8497b05d51f0163f7abb425f4231fd3e8145a53e80bed.png)  
+
+
 ![图 1](../images/2ffc51527299c38302924a74d5bbf66a39051bef35738e98adb30aac09d15218.png)  
 
 
@@ -282,7 +295,7 @@ rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, rays=batch_rays,
                                                 **render_kwargs_train)
 ```
 
-# 问题
+# 5. 问题
 
 图像上一个点对应一条光线还是多条光线的平均？也就是说，图像像素个数和光线个数一致吗？
 好像是的。为了渲染一幅1920x1280的图片，需要1920x1280条光线，每条光线(128+64)个粗和线的采样，即MLP需要做1920x1280x(128+64)查询。

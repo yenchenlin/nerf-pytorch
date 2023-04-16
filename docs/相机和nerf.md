@@ -1,6 +1,10 @@
-[NeRF代码解读-相机参数与坐标系变换](https://zhuanlan.zhihu.com/p/593204605)
+- [1. 物像关系](#1-物像关系)
+- [2. FOV](#2-fov)
+- [3. 相机坐标](#3-相机坐标)
+- [4. 坐标系](#4-坐标系)
 
-## 物像关系
+---
+## 1. 物像关系
 
 $\dfrac{1}{f} = \dfrac{1}{d_1} + \dfrac{1}{d_2}$
 
@@ -8,7 +12,7 @@ f为焦距，d1为物距（物体到透镜的距离），d2为像距（透镜到
 
 [由此可以推出不同的成像关系](https://www.zhihu.com/question/38929736/answer/2327108553)
 
-## FOV
+## 2. FOV
 视场角，即Field of view（FOV）。焦距越短，FOV越大；焦距越长，FOV越小。
 
 公式就是tan三角函数联系起焦距与高宽、或物距与物高宽。
@@ -28,7 +32,7 @@ focal = .5 * W / np.tan(.5 * camera_angle_x)
 
 `W`的单位是pixel， f的单位也是pixel。
 
-## 相机坐标
+## 3. 相机坐标
 
 相机两个参数：内参和外参
 - 内参intrinsics，即**K**
@@ -68,14 +72,20 @@ NeRF主要使用c2w，这里详细介绍一下c2w的含义。c2w矩阵是一个4
 ![图 7](../images/c2b2c7aff71ab6c0053f2367b48b604c39093e0134a9f8d8f2b46afc01b6b0d0.png)  
 旋转矩阵的第一列到第三列分别表示了相机坐标系的X, Y, Z轴在世界坐标系下对应的方向；平移向量表示的是相机原点在世界坐标系的对应位置。
 
-## 坐标系
+## 4. 坐标系
 
 世界坐标系，相机坐标系，像素坐标系
 
+
+> ABC对应XYZ
+
+![图 8](../images/0b2e24a1c6d97650f49d5d02e08f0f244fa60e9a700c62330261ddb30daeb61d.png)  
+
+
 ![图 4](../images/f543774d2d57cb991abf472608bf10221a356f9e287b95aad9a49a5d7548670f.png)  
 
-> X轴指向right，Y轴指向Down，Z轴指向Foward
+![图 3](../images/d7811eeb810841979e5f8cbd88f6e6d71e2744c4d464081863dd8d93079e2370.png)  
 
-![图 5](../images/171650a86fa2620789dad672d5f50e3c45cafe8dc748c840b9464d481b48545b.png)  
 
-![图 8](../images/2c5ea1444f1a3c889a7031adb86d496845824931637e11f01f3efd54853b303c.png)  
+![图 4](../images/48b46404b809bc67b121791f53db54e68eb85eaec2c3968048c70024f1e81280.png)  
+![图 5](../images/872d8ed4d1075b1b5cadc6434a6987e6d28d73e50a72fcdb8dc49a8cb743a7c6.png)  
