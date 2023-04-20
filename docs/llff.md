@@ -1,10 +1,42 @@
+- [1. load\_llff\_data](#1-load_llff_data)
+  - [1.1. other](#11-other)
+    - [1.1.1. \_minify](#111-_minify)
+  - [1.2. poses overview](#12-poses-overview)
+    - [1.2.1. \_load\_data](#121-_load_data)
+    - [1.2.2. recenter\_poses](#122-recenter_poses)
+
+---
+# 1. load_llff_data
+
+[load_llff.py](../load_llff.py)
+
+load_llff_data：
+- 造图片的:_minify
+- poses: 
+    - _load_data
+    - recenter_poses
+
+- 其他基本：
+    - normalize：向量的单位化
+    - viewmatrix：求X轴的方向。
+    - poses_avg：求多个输入相机的平均位姿c2w
+    - ptstocam
+    - render_path_spiral
+    - spherify_poses
+
+## 1.1. other
+
+### 1.1.1. _minify
+
+原本来自[LLFF](https://github.com/Fyusion/LLFF/blob/master/llff/poses/pose_utils.py#L195)
 
 
-load_llff.py
-
-## load_llff_data
-
-### poses overview
+> 单独拿出来使用
+```python
+basedir = r'C:\Users\lab\git\NeuLF\dataset\Statue'
+_minify(basedir, factors=[2], resolutions=[[200,300]])
+```
+## 1.2. poses overview
 
 `_load_data`: 
 1. `poses_bounds.npy`: `(N, 17)`
@@ -33,27 +65,20 @@ load_llff.py
 ![图 6](../images/ad6950fac7b21105815413e7da8faaf7ebbfd28a4f7aeedefbed1b10e2f6b601.png)  
 
 
-### _minify
 
-原本来自[LLFF](https://github.com/Fyusion/LLFF/blob/master/llff/poses/pose_utils.py#L195)
-
-```python
-basedir = r'C:\Users\lab\git\NeuLF\dataset\Statue'
-_minify(basedir, factors=[2], resolutions=[[200,300]])
-```
-
-### _load_data
+### 1.2.1. _load_data
 
 原本来自[LLFF](https://github.com/Fyusion/LLFF/blob/master/llff/poses/pose_utils.py#L195)
 
 
-### recenter_poses
+### 1.2.2. recenter_poses
 输入N个相机位姿，会返回N个中心化后的相机位姿（所有输入位姿的平均位姿和世界坐标系坐标轴对齐）：
 1. `poses_avg(poses)`, 得到多个输入相机的平均位姿c2w（R和t）
     ![图 7](../images/9d4c8f60aa3c6446d765cb69f9bafe5803ecbd64ea7cc6e56864ac28e2c6a04f.png)  
+
 2. 让平均位姿c2w和各个位姿poses，附加上[0,0,0,1]，变成完整的外参形式
+
 3. 用平均位姿c2w的逆左乘到输入的相机位姿上就完成了中心化。
 
-![图 6](../images/ad6950fac7b21105815413e7da8faaf7ebbfd28a4f7aeedefbed1b10e2f6b601.png)  
-
+    ![图 6](../images/ad6950fac7b21105815413e7da8faaf7ebbfd28a4f7aeedefbed1b10e2f6b601.png)  
 

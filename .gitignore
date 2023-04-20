@@ -1,11 +1,6 @@
+!images/*
 **/.ipynb_checkpoints
 **/__pycache__
-*.png
-*.mp4
-*.npy
-*.npz
-*.dae
-data/*
 logs/*
-!/images/*
-/nerf_example_data/*
+nerf_example_data/*
+configs/*

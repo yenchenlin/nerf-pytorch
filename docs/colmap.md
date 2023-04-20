@@ -1,3 +1,7 @@
+- [1. download](#1-download)
+- [2. usage](#2-usage)
+  - [2.1. Automatically reconstruct is all you need](#21-automatically-reconstruct-is-all-you-need)
+  - [2.2. cli](#22-cli)
 
 ## 1. download
 
@@ -32,7 +36,11 @@ Assuming you stored the images of your project in the following structure:
 ```
 
 1. Click `Reconstruction > Automatic Reconstruction` in the GUI.
-2. select `path/to/project` as a workspace folder, your images are located in `path/to/project/images`.
+2. select `path/to/project` as a **workspace folder**, select `path/to/project/images` as a **image folder**。
+    注意：不是`images_4`，用原始大小的。因为`_load_data`计算poses和bds时会除以传入的factor=4，所以colmap就该选没被处理过的原始图片。
+
+    ![图 9](../images/fdbb210f4f500fb0c415d7409299dec566d49ccb6d32e9d1e27e9a845cd5338f.png)  
+
 3. The output is written to the workspace folder. The folder would look similar to this:
 ```bash
 +── images
@@ -56,8 +64,10 @@ Assuming you stored the images of your project in the following structure:
 │   +── ...
 +── database.db
 ```
+![图 10](../images/29453f61b3aeea97a48e4bb4c799e685c2824ffb49bbdcf10507b24c7c4854fc.png)  
+可以去掉Dense model，因为nerf用不到。
 
-What is most important?
+我们要的结果：
 - `sparse/0/`下的`cameras.bin`, `images.bin`, `points3D.bin`
 ### 2.2. cli
 
@@ -89,6 +99,8 @@ $ colmap mapper \
     --database_path $DATASET_PATH/database.db \
     --image_path $DATASET_PATH/images \
     --output_path $DATASET_PATH/sparse
+
+### 对于Nerf，基本到此就不用了
 
 $ mkdir $DATASET_PATH/dense
 

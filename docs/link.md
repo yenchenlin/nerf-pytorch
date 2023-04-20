@@ -235,6 +235,8 @@ class NeRF(nn.Module):
         return outputs    
 ```
 
+The final activations in generating σ(t) and c(t) are a ReLU and a sigmoid respectively, as density must be non-negative and color must be in [0, 1].
+
 ## 4.1. train
 
 ```python
@@ -243,11 +245,6 @@ class NeRF(nn.Module):
                         help='batch size (number of random rays per gradient step)')
 ```
 
-
-```python
-# 因为最后一行都是`[0, 0, 0, 1]`
-pose = poses[img_i, :3,:4]
-```
 
 
 ## 4.2. render
@@ -302,3 +299,6 @@ rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, rays=batch_rays,
 
 
 以一个像素点 $P(u,v)$为例讲解：从该点发出的射线在世界坐标系中的表示为： $R^{-1}*K^{-1}(u,v,1)^{T}$， c2w = (R, t)
+
+
+这个rendered image就是在image plane上。

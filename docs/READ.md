@@ -5,9 +5,6 @@
 - principal point是什么？
 - NDC space是什么？screen space是什么？
 
-数据集：
-- bd是什么
-- poses_arr的shape是什么意思？poses_arr被分成poses和bds
 
 
 
@@ -18,14 +15,6 @@ def imread(f):
         return imageio.imread(f)
 
 imgs = [imread(f)[...,:3]/255. for f in imgfiles]
-
-这样有意义吗？
-
-
-def normalize(x):
-    return x / np.linalg.norm(x)
-
-这归一化有什么意义？
 
 
 
