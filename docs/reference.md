@@ -5,3 +5,5 @@
 [华为云开发者联盟 -【NeRF】深度解读yenchenlin/nerf-pytorch项目](https://huaweicloud.csdn.net/63806ddedacf622b8df88375.html)
 
 [NeRF代码解读-相机参数与坐标系变换](https://zhuanlan.zhihu.com/p/593204605)
+
+[NeRF论文复现](https://enigmatisms.github.io/2022/03/27/NeRF%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0/)

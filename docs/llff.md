@@ -30,12 +30,8 @@ load_llff_data：
 
 原本来自[LLFF](https://github.com/Fyusion/LLFF/blob/master/llff/poses/pose_utils.py#L195)
 
+见 nerf_utils/utils/minify.py
 
-> 单独拿出来使用
-```python
-basedir = r'C:\Users\lab\git\NeuLF\dataset\Statue'
-_minify(basedir, factors=[2], resolutions=[[200,300]])
-```
 ## 1.2. poses overview
 
 `_load_data`: 
@@ -58,9 +54,11 @@ _minify(basedir, factors=[2], resolutions=[[200,300]])
 
 5. 调整方向LLFF的DRB方向到NeRF的RUB方向
 
-6. 变成(N,...)的样本在第一维度的格式：`poses`: (N, 3, 5), `bds`: (N, 2), `images`: (N, H, W, C)
+6. 变成(N,...)的样本在第一维度的格式：`poses`: (N, 3, 5), `bds`: (N, 2), `images`: (N, H, W, C), [0, 1.0]范围。
 
-7. `recenter_poses`: 中心化相机位姿。结果还是(N, 3, 5)
+7. `bd_factor`: 调整`bds`和poses的平移量t
+
+8. `recenter_poses`: 中心化相机位姿。结果还是(N, 3, 5)
 
 ![图 6](../images/ad6950fac7b21105815413e7da8faaf7ebbfd28a4f7aeedefbed1b10e2f6b601.png)  
 

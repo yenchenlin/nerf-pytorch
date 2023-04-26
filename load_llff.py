@@ -6,15 +6,8 @@ import os, imageio
 ##########  see https://github.com/Fyusion/LLFF for original
 def _minify(basedir, factors=[], resolutions=[]):
     '''
-    according to the `factor` or `resolution` to scale the images in `images` and save the result to the corresponding subdirectory `images_{}` or `images_{}x{}`.
-    `factor` and `resolution` can be both used.
-    NOTE: run in linux, `cp` and `rm`. And a special cli `mogrify`
-    :param basedir: the parent directory of `images` directory
-    :param factors: list for many different factors, e.g. `images_4` and `images_8` for the `factors=[4, 8]`
-    :param resolutions: as same as.
+    见 nerf_utils/utils/minify.py
     '''
-
-    # 根据其要求的文件夹，如果有一个不存在，就重新生成。否则，都在就直接return。
     needtoload = False
     for r in factors:
         imgdir = os.path.join(basedir, 'images_{}'.format(r))
@@ -38,7 +31,6 @@ def _minify(basedir, factors=[], resolutions=[]):
     wd = os.getcwd()
 
     for r in factors + resolutions:
-        # 判断其是factors还是resolutions
         if isinstance(r, int):
             name = 'images_{}'.format(r)
             resizearg = '{}%'.format(100./r)
@@ -46,17 +38,10 @@ def _minify(basedir, factors=[], resolutions=[]):
             name = 'images_{}x{}'.format(r[1], r[0])
             resizearg = '{}x{}'.format(r[1], r[0])
         imgdir = os.path.join(basedir, name)
-        # 跳过那些已经存在的
         if os.path.exists(imgdir):
             continue
             
         print('Minifying', r, basedir)
-
-        # 1. 创建相应文件夹
-        # 2. 先复制原图片过去         
-        # 3. 跳转到子文件夹，使用mogrify命令缩放
-        # 4. 跳转回去
-        # 5. 删除复制的过来的原格式图片，我们要转成png，如果原格式ext是png，那么就不用删除（因为mogrify处理相同格式时，the original image file is overwritten）。
         os.makedirs(imgdir)
         check_output('cp {}/* {}'.format(imgdir_orig, imgdir), shell=True)
         
@@ -77,23 +62,26 @@ def _minify(basedir, factors=[], resolutions=[]):
         
 def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     '''
-    :param basedir: 'nerf_lllf_data/fern'，包含20张图片
+    从poses_bounds.npy中提取出 poses, bds, imgs
+
+    :param basedir: 'nerf_lllf_data/fern', 包含20张图片, poses_bounds.npy
     :return poses, bds, imgs: 都是样本数量在最后一维的格式
     '''
     ###### 拆分poses_bounds.npy，最后一维是样本数量。
-    # (20,17)， where N is the number of input images
+    # (N,17), 即(20,17)， where N is the number of input images
     poses_arr = np.load(os.path.join(basedir, 'poses_bounds.npy'))
     # (3, 5, 20): (20, 17)→(20, 15)→(20, 3, 5)→(3,5,20)
     poses = poses_arr[:, :-2].reshape([-1, 3, 5]).transpose([1,2,0])
     # (2, 20)：(20, 2)→(2, 20)
     bds = poses_arr[:, -2:].transpose([1,0])
-    
+
+    # 缩放图片
     img0 = [os.path.join(basedir, 'images', f) for f in sorted(os.listdir(os.path.join(basedir, 'images'))) \
             if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')][0]
+    # H,W,C
     sh = imageio.imread(img0).shape
     
     sfx = ''
-    # 缩放
     if factor is not None:
         sfx = '_{}'.format(factor)
         _minify(basedir, factors=[factor])
@@ -111,24 +99,25 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     else:
         factor = 1
     
-    # 判断创建成功了吗
+    # 判断创建缩放后的图片文件夹成功了吗
     imgdir = os.path.join(basedir, 'images' + sfx)
     if not os.path.exists(imgdir):
         print( imgdir, 'does not exist, returning' )
         return
     
+    # 判断poses内的pose数量匹配图片的数量吗
     imgfiles = [os.path.join(imgdir, f) for f in sorted(os.listdir(imgdir)) if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')]
-    # 判断poses匹配图片吗
     if poses.shape[-1] != len(imgfiles):
         print( 'Mismatch between imgs {} and poses {} !!!!'.format(len(imgfiles), poses.shape[-1]) )
         return
     
+    # 第五列的HWF，给其赋值缩放后的图片的HW
     sh = imageio.imread(imgfiles[0]).shape
-    # 第五列的HWF赋值HW
     poses[:2, 4, :] = np.array(sh[:2]).reshape([2, 1])
     # 第五列的Focal按系数缩放
     poses[2, 4, :] = poses[2, 4, :] * 1./factor
     
+    # 读入缩放后的图片
     if not load_imgs:
         return poses, bds
     
@@ -137,10 +126,12 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
             return imageio.imread(f, ignoregamma=True)
         else:
             return imageio.imread(f)
-        
+
+    # [0, 1.0]    
     imgs = [imread(f)[...,:3]/255. for f in imgfiles]
     imgs = np.stack(imgs, -1)  
     
+    # HWCN, 第一个pose的最后一列HWF
     print('Loaded image data', imgs.shape, poses[:,-1,0])
     return poses, bds, imgs
 
@@ -201,14 +192,20 @@ def poses_avg(poses):
 
 def render_path_spiral(c2w, up, rads, focal, zdelta, zrate, rots, N):
     '''
-    :return : 一段螺旋式的相机轨迹
-    :
+    :return : 一段螺旋式的相机轨迹的pose, 但是这个pose是c2w还是w2c?
+    :param c2w: 平均位姿
+    :param up: y轴
+    :param rads: shape (3,)。什么意思?
+    :param rots: 2。什么意思?
+    :param N: 多少个渲染视角。
     '''
     render_poses = []
+    # shape: (4,)
     rads = np.array(list(rads) + [1.])
     hwf = c2w[:,4:5]
     
     for theta in np.linspace(0., 2. * np.pi * rots, N+1)[:-1]:
+        # 将相机坐标下的点，转换到世界坐标下
         c = np.dot(c2w[:3,:4], np.array([np.cos(theta), -np.sin(theta), -np.sin(theta*zrate), 1.]) * rads) 
         z = normalize(c - np.dot(c2w[:3,:4], np.array([0,0,-focal, 1.])))
         render_poses.append(np.concatenate([viewmatrix(z, up, c), hwf], 1))
@@ -240,7 +237,9 @@ def recenter_poses(poses):
 
 
 def spherify_poses(poses, bds):
-    
+    '''
+    360°的环绕渲染位姿
+    '''
     p34_to_44 = lambda p : np.concatenate([p, np.tile(np.reshape(np.eye(4)[-1,:], [1,1,4]), [p.shape[0], 1,1])], 1)
     
     rays_d = poses[:,:3,2:3]
@@ -373,6 +372,7 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
         
     render_poses = np.array(render_poses).astype(np.float32)
 
+    # 只看平移量，找出平均位姿 c2w 和位姿 poses 间的最小平移量的位姿，其下标为 i_test
     c2w = poses_avg(poses)
     print('Data:')
     print(poses.shape, images.shape, bds.shape)
