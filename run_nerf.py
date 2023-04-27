@@ -143,6 +143,7 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
         H = H//render_factor
         W = W//render_factor
         focal = focal/render_factor
+        K[:2, :3] /= render_factor
 
     rgbs = []
     disps = []
