@@ -5,7 +5,7 @@
   - [3.2. 外参](#32-外参)
 - [4. 坐标系](#4-坐标系)
   - [4.1. 右手坐标系 right-handed coordinates](#41-右手坐标系-right-handed-coordinates)
-  - [4.2. 相机坐标系](#42-相机坐标系)
+  - [4.2. 各种右手的相机坐标系](#42-各种右手的相机坐标系)
 - [5. Frame Transforms](#5-frame-transforms)
   - [5.1. 世界坐标系\<-\>相机坐标系](#51-世界坐标系-相机坐标系)
   - [5.2. 透射](#52-透射)
@@ -112,6 +112,8 @@ K = np.array([
 
 ### 3.2. 外参
 
+let's consider **translation for points (positions)** and **rotations for vectors (directions)**.
+
 > 相机外参是一个4x4的矩阵M。
 
 相机外参叫做**world-to-camera (w2c)矩阵**，其作用是把3D世界坐标系的坐标变换到2D相机坐标系的坐标。
@@ -145,8 +147,26 @@ The camera's extrinsic matrix describes the camera's location in the world, and 
 - 旋转矩阵的每一列分别表示了相机坐标系的XYZ轴方向在世界坐标系下对应的XYZ轴方向。
     R'columns are the directions of the camera-axes in the world coordinates.
 
-- 平移向量表示的是相机原点在世界坐标中的位置。
+- 平移向量表示的是相机原点在世界坐标中的位置。即后文讲的**世界坐标下看相机坐标原点的平移向量**。
     The sign of $t_x$, $t_y$, $t_z$ should reflect the position of the camera origin appears in the world coordinates.
+
+- 意义：将相机坐标系与世界坐标系的转换分解为旋转和平移的过程。
+
+    ![图 5](../images/ee3d0db691dffa4d96f9ffcaabf9cb0e52ac6a3ded1da48014924c67fb1d696f.png)  
+
+    描述点B。在绿色坐标系下，B点(1,2)。在蓝色坐标系下，B点(2,2)。怎么转化？借助向量。
+
+    描述向量AB。在绿色坐标系下，AB是起点(0,0)和方向向量(1,2)，即AB(1,2)=(0,0)+(1,2)。在蓝色坐标系下是CB=CA+AB, (2,2)=(0,1)+(2,1)。
+    也即A点(0,1)和B点(2,2)=(1,2)-(-1,0)。
+    怎么做到从绿色到蓝色？旋转坐标系，方向向量(2,1)变化为(1,2)，平移向量(-1,0)就是在绿色坐标系下观察的世界坐标系原点的位置。
+
+    ![图 6](../images/a3b6257693f7e85d96f84d846a740dac3f521287df3779978b9079484f8d3203.png)  
+
+    相机坐标系虚线坐标轴，世界坐标系彩色坐标轴。相机坐标的黑色OA，选转后世界坐标的OB，在相机坐标下看世界坐标原点的平移量是粉色的OO'，世界坐标的O'C = OB - OO'。
+
+    也就是说，关键点，**世界坐标下的向量 = 旋转后的向量 - 相机坐标下看世界坐标原点的平移向量**，或者，****世界坐标下的向量 = 旋转后的向量 + 世界坐标下看相机坐标原点的平移向量****。后者才是矩阵中的 $t$。
+
+
 
 > w2c
 
@@ -182,11 +202,21 @@ Express motion information relative to a reference frame.
 
 三指：右手，大拇指a，食指b，中指的方向就是axb。（是大食中、食中大、中大食的升序，而不是中食大等的降序）
 
-![图 2](../images/6d063cd15878e415ddb39c6cd88bce1593b60e2376f06373b7aa7493f9b87758.png)  
+![图 2](../images/e64bdd1708f9aaa11f38fd1efd544325dac5aee40d904accfee17c096283c59e.png)  
 
-### 4.2. 相机坐标系
 
-ABC对应XYZ
+> 将左右手性和right-up-forward联系在一起，而不是xyz
+
+![图 3](../images/e8c52001b6f627664240997c2677db5bb989c04d4ada4e4dcaa433de12a624af.png)  
+
+图中b还是右手性，是认为up是z轴，按照right-up-forward来判断它还是右手性。
+
+The only thing that defines the handedness of the coordinate system is the orientation of the left (or right) vector relative to the up and forward vectors, regardless of what these axes represent.
+
+Currently, the industry standard tends to be the right-hand XYZ coordinate system where x points to the right, y is up, and z is backwards (coming out of the screen).
+### 4.2. 各种右手的相机坐标系
+
+
 
 ![图 8](../images/0b2e24a1c6d97650f49d5d02e08f0f244fa60e9a700c62330261ddb30daeb61d.png)  
 

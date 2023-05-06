@@ -121,14 +121,15 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     if not load_imgs:
         return poses, bds
     
-    def imread(f):
-        if f.endswith('png'):
-            return imageio.imread(f, ignoregamma=True)
-        else:
-            return imageio.imread(f)
+    # 这段代码可以去掉了， 'Gamma correction is now not applied anymore by default'
+    # def imread(f):
+    #     if f.endswith('png'):
+    #         return imageio.imread(f, ignoregamma=True)
+    #     else:
+    #         return imageio.imread(f)
 
     # [0, 1.0]    
-    imgs = [imread(f)[...,:3]/255. for f in imgfiles]
+    imgs = [imageio.imread(f)[...,:3]/255. for f in imgfiles]
     imgs = np.stack(imgs, -1)  
     
     # HWCN, 第一个pose的最后一列HWF
@@ -147,19 +148,17 @@ def normalize(x):
 
 def viewmatrix(z, up, pos):
     '''
-    目的是求X轴的方向。
-    由于X轴同时和Z轴和Y轴垂直（因为R是旋转矩阵，旋转矩阵的向量正交）, 我们可以用Y轴与Z轴的叉乘得到X轴方向
+    已知z和任一xy平面的向量up，得到x和y向量。
     :param up: RUB, 自然up对应y轴
     :param pos: 即t平移向量
     :return : c2w, 3行4列。
     '''
-    # 方向向量z
     vec2 = normalize(z)
-    # 粗糙的y向量：传入的up(Y)轴是通过一些计算得到的，不一定和Z轴垂直
     vec1_avg = up
     # 叉乘得到x轴方向向量
     vec0 = normalize(np.cross(vec1_avg, vec2))
     # 叉乘得到，校准后的y轴方向向量
+    # 这里其实不需要再次单位化: 两个互向正交的单位向量的叉乘，结果必然还是单位向量。$‖u×v‖=‖u‖⋅‖v‖⋅\sin⁡\theta, where \theta=90°$
     vec1 = normalize(np.cross(vec2, vec0))
     # [x轴，y轴，z轴，平移]
     m = np.stack([vec0, vec1, vec2, pos], 1)
@@ -298,7 +297,13 @@ def spherify_poses(poses, bds):
     
 
 def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False):
-    
+    '''
+    @return images: (N, H, W, C), np.float32, [0, 1.0]
+    @return poses: (N, 3, 5), np.float32
+    @return bds: colmap生成的depth values that bound the closest and farthest scene content from that point of view（是离相机远近）.
+    @return render_poses: np.float32
+    @return i_test
+    '''
 
     poses, bds, imgs = _load_data(basedir, factor=factor) # factor=8 downsamples original imgs by 8x
     print('Loaded', basedir, bds.min(), bds.max())
@@ -342,9 +347,6 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
         close_depth, inf_depth = bds.min()*.9, bds.max()*5.
         dt = .75
         
-        # 根据$\dfrac{1}{f} = \dfrac{1}{z_0} + \dfrac{1}{z_i}$，
-        # 从而 $f = \dfrac{1}{\dfrac{1}{z_0} + \dfrac{1}{z_i}}$
-        # $\dfrac{1.}{\dfrac{1.-dt}{\text{close\_depth}} + \dfrac{dt}{\text{inf\_depth}}}$
         mean_dz = 1./(((1.-dt)/close_depth + dt/inf_depth))
         focal = mean_dz
 

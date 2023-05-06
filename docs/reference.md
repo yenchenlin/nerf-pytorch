@@ -7,3 +7,5 @@
 [NeRF代码解读-相机参数与坐标系变换](https://zhuanlan.zhihu.com/p/593204605)
 
 [NeRF论文复现](https://enigmatisms.github.io/2022/03/27/NeRF%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0/)
+
+[Scratchapixel 3.0](https://www.scratchapixel.com/index.html)

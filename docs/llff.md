@@ -4,6 +4,7 @@
   - [1.2. poses overview](#12-poses-overview)
     - [1.2.1. \_load\_data](#121-_load_data)
     - [1.2.2. recenter\_poses](#122-recenter_poses)
+    - [viewmatrix](#viewmatrix)
 
 ---
 # 1. load_llff_data
@@ -52,7 +53,7 @@ load_llff_data：
 
 回到`load_llff_data`:
 
-5. 调整方向LLFF的DRB方向到NeRF的RUB方向
+5. `pose`调整方向LLFF的DRB方向到**NeRF的RUB方向**
 
 6. 变成(N,...)的样本在第一维度的格式：`poses`: (N, 3, 5), `bds`: (N, 2), `images`: (N, H, W, C), [0, 1.0]范围。
 
@@ -62,7 +63,16 @@ load_llff_data：
 
 ![图 6](../images/ad6950fac7b21105815413e7da8faaf7ebbfd28a4f7aeedefbed1b10e2f6b601.png)  
 
-
+9. Find a reasonable "focus depth" for this dataset
+根据$\dfrac{1}{f} = \dfrac{1}{z_0} + \dfrac{1}{z_i}$，
+从而 $f = \dfrac{1}{\dfrac{1}{z_0} + \dfrac{1}{z_i}}$
+$\dfrac{1.}{\dfrac{1.-dt}{\text{close\_depth}} + \dfrac{dt}{\text{inf\_depth}}}$
+```python
+close_depth, inf_depth = bds.min()*.9, bds.max()*5.
+dt = .75
+mean_dz = 1./(((1.-dt)/close_depth + dt/inf_depth))
+focal = mean_dz
+```
 
 ### 1.2.1. _load_data
 
@@ -80,3 +90,16 @@ load_llff_data：
 
     ![图 6](../images/ad6950fac7b21105815413e7da8faaf7ebbfd28a4f7aeedefbed1b10e2f6b601.png)  
 
+### viewmatrix
+
+也叫做 LookAt Function
+
+1. The idea is to calculate the cross vector between the vector `vec1_avg` and a arbitrary vector `vec2` (lies in the xz-plane). The result `vec0` is a vector that is necessarily perpendicular to the vector `vec1_avg` (xz-plane).
+
+2. Computing the cross product between these two vectors `vec2` and `vec0` will just give us the vector `vec2`.
+
+![图 1](../images/c0c1e71e4e9fbd0b833fee9029118d9bf3c1e947e1f0c85bf696d2a2dd6afc5f.png)  
+
+PS: `z`: computing the vector from the position of the camera and target point.
+
+![图 2](../images/8fd5c1e905926f189c0b419cb271dac809435418da6eb5b16ed76b0f27fff3bf.png)  

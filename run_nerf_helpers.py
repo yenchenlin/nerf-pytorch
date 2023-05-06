@@ -69,13 +69,22 @@ class NeRF(nn.Module):
         """ 
         """
         super(NeRF, self).__init__()
+        # D层MLP
         self.D = D
+        # 每层MLP宽
         self.W = W
+        # 输入的位置xyz
         self.input_ch = input_ch
+        # 输入的方向
         self.input_ch_views = input_ch_views
+        # 残差链接
         self.skips = skips
         self.use_viewdirs = use_viewdirs
         
+        # 一共8个输出维度是256的MLP，下面的下标是pts_linears中的，而不是for循环中的
+        # 下标0输入层MLP：[nn.Linear(input_ch, W)]
+        # 下标1,2,3,4,6,7的MLP: nn.Linear(W, W)
+        # 下标5的残差MLP：nn.Linear(W + input_ch, W)
         self.pts_linears = nn.ModuleList(
             [nn.Linear(input_ch, W)] + [nn.Linear(W, W) if i not in self.skips else nn.Linear(W + input_ch, W) for i in range(D-1)])
         
@@ -88,30 +97,36 @@ class NeRF(nn.Module):
         
         if use_viewdirs:
             self.feature_linear = nn.Linear(W, W)
+            # 密度
             self.alpha_linear = nn.Linear(W, 1)
             self.rgb_linear = nn.Linear(W//2, 3)
         else:
             self.output_linear = nn.Linear(W, output_ch)
 
     def forward(self, x):
+        # 划分输入数据为位置xyz和方向。
         input_pts, input_views = torch.split(x, [self.input_ch, self.input_ch_views], dim=-1)
         h = input_pts
         for i, l in enumerate(self.pts_linears):
             h = self.pts_linears[i](h)
             h = F.relu(h)
+            # 没问题，因为pts_linears加入了输入层，所以下标4的MLP其实位置是下标5
             if i in self.skips:
                 h = torch.cat([input_pts, h], -1)
 
         if self.use_viewdirs:
+            # 密度
             alpha = self.alpha_linear(h)
             feature = self.feature_linear(h)
+            # 方向
             h = torch.cat([feature, input_views], -1)
         
             for i, l in enumerate(self.views_linears):
                 h = self.views_linears[i](h)
                 h = F.relu(h)
-
+            # 颜色
             rgb = self.rgb_linear(h)
+            # 返回 颜色和密度
             outputs = torch.cat([rgb, alpha], -1)
         else:
             outputs = self.output_linear(h)
@@ -151,6 +166,7 @@ class NeRF(nn.Module):
 
 # Ray helpers
 def get_rays(H, W, K, c2w):
+    # 因为 pytorch's meshgrid 的indexing不同，所以这三行只是在等效 np.meshgrid，直接看get_rays_np
     i, j = torch.meshgrid(torch.linspace(0, W-1, W), torch.linspace(0, H-1, H))  # pytorch's meshgrid has indexing='ij'
     i = i.t()
     j = j.t()
@@ -163,9 +179,22 @@ def get_rays(H, W, K, c2w):
 
 
 def get_rays_np(H, W, K, c2w):
+    '''
+    给定一张图像的一个像素点，我们的目标是构造以相机中心为起始点，经过相机中心和像素点的射线。
+    @param H,W :图像的宽、高
+    @param K: 内参
+    @param c2w : 外参，[3,4], `c2w[:3,-1]`最后一列需要是t
+    @return rays_o: (H, W, 3). HxW个光线在世界坐标中的起点位置, 即HxW个一样的三个坐标。
+    @return rays_d: (H, W, 3). HxW个光线dirs。
+    '''
+    # input: (W, H)， output: (H, W)，行坐标有W个，纵坐标有H个。
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
+    # 射线方向 + 不同的相机坐标系转化
+    # (378, 504, 3)：相机坐标下，每个坐标对应三个值来表示射线方向
     dirs = np.stack([(i-K[0][2])/K[0][0], -(j-K[1][2])/K[1][1], -np.ones_like(i)], -1)
     # Rotate ray directions from camera frame to the world frame
+    # (378, 504, 1, 3) * (3, 3) = (378, 504, 3, 3)， 最后一个维度 (378, 504, 3)
+    # 相当于 rays_d = (dirs[..., np.newaxis, :] @ c2w[:3,:3].T).transpose(0,1,3,2).squeeze(-1)
     rays_d = np.sum(dirs[..., np.newaxis, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
     rays_o = np.broadcast_to(c2w[:3,-1], np.shape(rays_d))
