@@ -168,19 +168,6 @@ The camera's extrinsic matrix describes the camera's location in the world, and 
 
 
 
-> w2c
-
-![图 19](../images/2ee73e3e3e12cbd3c6038ada97006e0e0963cf7049df0fc9df2704e66e8bccd9.png)  
-
-$\begin{bmatrix} R_c & C \end{bmatrix}$表示camera's pose matrix(c2w)。
-所以，w2c 可以通过 c2w 的逆：
-
-$$
-\begin{aligned}
-R&=R^T_c
-\\ t&=-R^T_cC =-RC
-\end{aligned}
-$$
 
 
 
@@ -285,6 +272,10 @@ camtoworlds_opengl = camtoworlds_opencv @ np.diag([1, -1, -1, 1])
 $\begin{bmatrix} R & T \end{bmatrix}
 \begin{bmatrix} \cos(\theta) \\ -\sin(\theta) \\ -\sin(\theta*zrate) \\ 1 \end{bmatrix}$
 
+![图 1](../images/962653656f477ecdb5999f0d3a9108a94d3d07c8a53af8de76055e3d2368f298.png)  
+
+colmap已经设定好了世界坐标系，外参也是依据此世界坐标系的。
+
 ### 5.2. 透射
 
 #### 5.2.1. 相机坐标系<->图像坐标系
@@ -347,7 +338,7 @@ $
 
 ![图 26](../images/b899ce078ef1a11a8bdc6fdde427448eaecbada3eb4ffa9557a90a3afac8dd66.png) 
 
-$ Z_c\begin{bmatrix} u \\ v \\ 1\end{bmatrix} = KMP_w$
+$ Z_c\begin{bmatrix} u \\ v \\ 1\end{bmatrix} = KM_{w2c}P_w = K\left( R\begin{bmatrix} X_w \\ Y_w \\ Z_w \end{bmatrix} + t \right)$
 
 - 世界坐标系的欧式点$P_{w}=[X_{w}, Y_{w}, Z_{w}]$，像素坐标的齐次坐标点 $P_{uv}=[u, v]$
 
@@ -385,4 +376,21 @@ $ Z_c\begin{bmatrix} u \\ v \\ 1\end{bmatrix} = KMP_w$
 
 ## 反向
 
-$d_{u,v} = RK^{−1} \begin{bmatrix} v \\ u \\ 1 \end{bmatrix} + t$
+反向 $P_c \to P_w$
+
+> w2c
+
+w2c 可以通过 c2w 的逆
+
+![图 19](../images/2ee73e3e3e12cbd3c6038ada97006e0e0963cf7049df0fc9df2704e66e8bccd9.png)  
+
+- c2w: $M_{c2w} = [R, t]$
+
+    $$P_w = RK^{−1} \begin{bmatrix} v \\ u \\ 1 \end{bmatrix} + t $$
+
+- w2c: $M_{w2c} = [R, t]$，相当于 c2w 形式为 $M_{c2w} = M_{w2c}^{-1} = [R^T, -R^Tt]$
+
+    $$P_w = R^{T}K^{−1} \begin{bmatrix} v \\ u \\ 1 \end{bmatrix} + (-R^Tt)$$
+
+    - a target pixel $x\in\mathbf{RP}^{2}$ , w2c extrinsics $[R | t]$ , intrinsics $K$ .
+    - ray direction $v=R^{\top}K^{-1}x$

@@ -299,7 +299,7 @@ def spherify_poses(poses, bds):
 def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False):
     '''
     @return images: (N, H, W, C), np.float32, [0, 1.0]
-    @return poses: (N, 3, 5), np.float32
+    @return poses: (N, 3, 5), R/t/hwf, np.float32
     @return bds: colmap生成的depth values that bound the closest and farthest scene content from that point of view（是离相机远近）.
     @return render_poses: np.float32
     @return i_test

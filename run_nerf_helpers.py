@@ -13,7 +13,29 @@ to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
 # Positional encoding (section 5.1)
 class Embedder:
+    '''
+    embed(inputs)是真正升维的调用，对输入数据生成升维的结果。
+    '''
     def __init__(self, **kwargs):
+        '''
+        kwargs:
+        - input_dims: int. 输入数据的维度
+        - include_input: bool, 包含原始输入数据吗. 建议True
+        - num_freqs: 使用periodic_fns得到升维的点的个数(原始数据的1个另算)。[sin(x^1), cos(x^1), ..., sin(x^(2^max_freq_log2)), cos(x^(2^max_freq_log2))], 共2*num_freqs个
+        - max_freq_log2: log2 of max freq. 即下面的32=2^max_freq_log2, 即max_freq_log2=5
+        - log_sampling: bool。True则低频多高频少[1,2,4,8,16,32], False则频率均等[1,7.2,13.4,19.6,25.8,32]
+        - periodic_fns: 基函数
+
+        Note: num_freqs=6, max_freq_log2=6-1, 共2*num_freqs个+1个(include_input=True)
+        embed_kwargs = {
+            'include_input' : True,
+            'input_dims' : 3,
+            'max_freq_log2' : multires-1,
+            'num_freqs' : multires,
+            'log_sampling' : True,
+            'periodic_fns' : [torch.sin, torch.cos],
+        }
+        '''
         self.kwargs = kwargs
         self.create_embedding_fn()
         
@@ -46,6 +68,9 @@ class Embedder:
 
 
 def get_embedder(multires, i=0):
+    '''
+    
+    '''
     if i == -1:
         return nn.Identity(), 3
     

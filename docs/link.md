@@ -154,28 +154,11 @@ $$
 
 ![图 2](../images/093cbe95a5eabf5685a649913018b32ba5f5b14493e704cba43cca7aaa8b7cfb.png)  
 
+MLP的架构，使得体积密度仅被预测为 **3D 位置**的函数，而发射的辐射率被预测为 **3D 位置和 2D 观察方向**的函数。
 
-```python
-N_importance = 128
-# parser.add_argument("--N_importance", type=int, default=0,
-#                         help='number of additional fine samples per ray')
-
-# 没什么意义，在NeRF mdoel定义中， output_ch 只在不使用 use_viewdirs 时才作用
-output_ch = 5 if args.N_importance > 0 else 4
+MLP 可以被认为是为每个输入的 3D 位置预测一个 256 维的**特征向量**，然后将其与观察方向连接起来并解码为**RGB 颜色**。
 
 
-skips = [4] # 取默认值
-
-### model是粗模型，model_fine是精细模型
-model = NeRF(D=args.netdepth, W=args.netwidth,
-                input_ch=input_ch, output_ch=output_ch, skips=skips,
-                input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs).to(device)
-
-if args.N_importance > 0:
-    model_fine = NeRF(D=args.netdepth_fine, W=args.netwidth_fine,
-                        input_ch=input_ch, output_ch=output_ch, skips=skips,
-                        input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs).to(device)
-```
 ![图 8](../images/3ae31f519d1d3fc3ae0b5b24d8dbbf0af67c89b67b819024546d9b461caf5c23.png)  
 
 
@@ -199,11 +182,11 @@ The final activations in generating σ(t) and c(t) are a ReLU and a sigmoid resp
 
 【连续形式】
 
-$C(\bold{r})=    \int^{t_f}_{t_n}{T(t)σ(\bold{r}(t))\bold{c}(\bold{r}(t),\bold{d})}{\rm d}t$ 
+$$C(\bold{r})=    \int^{t_f}_{t_n}{T(t)σ(\bold{r}(t))\bold{c}(\bold{r}(t),\bold{d})}{\rm d}t$$ 
 
 其中
 
-$T(t) = \rm{exp} \left( -\int^{t}_{t_n} {σ(\bold{r}(s))}{\rm d}s \right)$
+$$T(t) = \rm{exp} \left( -\int^{t}_{t_n} {σ(\bold{r}(s))}{\rm d}s \right)$$
 
 
 【离散形式】
@@ -260,7 +243,7 @@ $$
 
 > 转化成不透明度的角度就好理解了
 
-$\alpha$表示不透明度，$T_i$透射率就是前面粒子的不透明率的残余相乘，或者说透明度透过的光线相乘，很直观地符合图像里的Alpha Blending。
+$\alpha$表示不透明度，$T_i$透射率就是前面粒子的透明度相乘，留给后面粒子的可见程度，很直观地符合图像里的Alpha Blending。
 
 $$
 \begin{aligned} 
