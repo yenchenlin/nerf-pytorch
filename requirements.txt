@@ -1,9 +1,10 @@
-torch==1.11.0
-torchvision>=0.9.1
+configargparse
 imageio
 imageio-ffmpeg
 matplotlib
-configargparse
-tensorboard>=2.0
-tqdm
+numpy
 opencv-python
+tensorboard>=2.0
+torch>=1.11.0
+torchvision>=0.9.1
+tqdm
