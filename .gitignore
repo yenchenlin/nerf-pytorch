@@ -1,6 +1,7 @@
-!images/*
 **/.ipynb_checkpoints
 **/__pycache__
 logs/*
 nerf_example_data/*
 configs/*
+data/*
+!data

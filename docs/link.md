@@ -1,7 +1,6 @@
 - [1. load\_blender.py](#1-load_blenderpy)
 - [2. run\_nerf.py](#2-run_nerfpy)
 - [3. run\_nerf\_helpers.py](#3-run_nerf_helperspy)
-- [4. run\_nerf.py](#4-run_nerfpy)
     - [4.0.1. MLP](#401-mlp)
   - [4.1. train](#41-train)
   - [4.2. render](#42-render)
@@ -112,37 +111,7 @@ class NeRF(nn.Module):
     ):
 ```
 
-# 4. run_nerf.py
-positional encoding的结果还cat了原始输入的低频信号
-`create_nerf()`
-```python
-# 位置编码 location，由3维变成63维度。
-embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
-# args.multires = 10, sin和cos几次。
-# args.i_embed = 0， 默认表示使用编码。
-# input_ch = 63， 63 = 1 * 3 + （2 * 10）* 3 = 原本xyz + （sin, cos 10次）* 3维度
-    # def get_embedder(multires, i=0):
-    #     if i == -1:
-    #         return nn.Identity(), 3
-        
-    #     embed_kwargs = {
-    #                 'include_input' : True,       # 表示加入原生的与否，这就是同原版position encoding的不同之处。
-    #                 'input_dims' : 3,
-    #                 'max_freq_log2' : multires-1, # 9
-    #                 'num_freqs' : multires,       # 10, sin和cos几次。
-    #                 'log_sampling' : True,        # 决定是1, 2, 4, 8 ,16 还是 1到16等距离采样。
-    #                 'periodic_fns' : [torch.sin, torch.cos],
-    #     }
-        
-    #     embedder_obj = Embedder(**embed_kwargs)
-    #     embed = lambda x, eo=embedder_obj : eo.embed(x)
-    #     return embed, embedder_obj.out_dim
-
-# 位置编码 direction，由3维变成27维度。
-embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed)
-# args.multires_views = 4, sin和cos几次。
-# input_ch = 27， 27 = 1 * 3 + （2 * 4）* 3 = 原本diretion的三维度表示 + （sin, cos 4次）* 3维度
-```
+`output_ch = 5 if args.N_importance > 0 else 4` 只在不使用方向时`use_viewdirs=False`有效果，正常使用方向时就是4.
 
 ### 4.0.1. MLP
 
@@ -237,7 +206,7 @@ $$
 \begin{aligned} 
 \hat{C}(\boldsymbol{r}) &=\sum_{i=1}^N T_i (1-\exp(-\sigma_i\delta_i)) \boldsymbol{c}_i, 
 \\ T_i &=\exp{\left(-\sum_{j=1}^{i-1}{\sigma_j\delta_j} \right)},
-\\ \operatorname{where} \delta_i &= t_{i} - t_{i-1}
+\\ \operatorname{where} \delta_i &= t_{i+1} - t_{i}
 \end{aligned}
 $$
 
@@ -250,8 +219,9 @@ $$
 \hat{C}(\boldsymbol{r}) &=\sum_{i=1}^N T_i \alpha_i \boldsymbol{c}_i, 
 \\ \alpha_i &=\operatorname{alpha}\left(\sigma_i, \delta_i\right)=1-\exp \left(-\sigma_i \delta_i\right), 
 \\ T_i &=\prod_{j=1}^{i-1}\left(1-\alpha_j\right) 
-\\ \operatorname{where} \delta_i &= t_{i} - t_{i-1}
+\\ \operatorname{where} \delta_i &= t_{i+1} - t_{i}
 \end{aligned}
+\\ \text{特殊点}, T_1 = 1, \delta_n 取 e^{10}
 $$
 
 ![图 1](../images/3c507798d267321eb2e8497b05d51f0163f7abb425f4231fd3e8145a53e80bed.png)  

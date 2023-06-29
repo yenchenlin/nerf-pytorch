@@ -24,18 +24,18 @@ This project is a faithful PyTorch implementation of [NeRF](http://www.matthewta
 
 ## 1.1. Installation
 
-```
+```bash
 git clone git@github.com:yenchenlin/nerf-pytorch.git
 cd nerf-pytorch
+conda create -n nerf python=3.10 -y
+conda activate nerf
 pip install -r requirements.txt
 ```
 
-  
 The LLFF data loader requires ImageMagick.
 
 You will also need the [LLFF code](http://github.com/fyusion/llff) (and COLMAP) set up to compute poses if you want to run on your own real data.
   
-</details>
 
 ## 1.2. Dataset
 ### 1.2.1. example dataset
@@ -94,7 +94,7 @@ python run_nerf.py --config configs/{DATASET}.txt --render_only
 
 You can download the pre-trained models [here](https://drive.google.com/drive/folders/1jIr8dkvefrQmv737fFm2isiT6tqpbTbv). Place the downloaded directory in `./logs` in order to test it later. See the following directory structure for an example:
 
-```
+```bash
 ├── logs 
 │   ├── fern_test
 │   ├── flower_test  # downloaded logs

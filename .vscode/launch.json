@@ -5,10 +5,10 @@
             "name": "Python: 当前文件",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "run_nerf.py",
             "console": "integratedTerminal",
             "args": [
-                "--config", "configs/fern.txt"
+                "--config", "configs/lego.txt"
             ]
         }
     ]

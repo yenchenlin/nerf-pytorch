@@ -27,17 +27,6 @@
   - 方向：我们现在有在相机坐标系下的从相机原点出发的向量`dirs`（也可以看作在相机坐标系下的物体的点），`dirs`与`c2w`的 $R$ 运算就得到了在世界坐标系的向量`rays_d`，`rays_o`只是原点之间的平移量。也就是说，`rays_d`和`rays_o`并不是光线的方向和起点，只是个半成品。
 
     `view_ray =  ray_o + ray_d`才是黄色的O'C.
-## Q 
-
-> imageio
-
-def imread(f):
-    if f.endswith('png'):
-        return imageio.imread(f, ignoregamma=True)
-    else:
-        return imageio.imread(f)
-
-imgs = [imread(f)[...,:3]/255. for f in imgfiles]
 
 > 为什么光线取反方向
 

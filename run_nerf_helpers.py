@@ -13,20 +13,18 @@ to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
 # Positional encoding (section 5.1)
 class Embedder:
-    '''
-    embed(inputs)是真正升维的调用，对输入数据生成升维的结果。
-    '''
-    def __init__(self, **kwargs):
-        '''
-        kwargs:
+    '''   
+    kwargs:
         - input_dims: int. 输入数据的维度
         - include_input: bool, 包含原始输入数据吗. 建议True
-        - num_freqs: 使用periodic_fns得到升维的点的个数(原始数据的1个另算)。[sin(x^1), cos(x^1), ..., sin(x^(2^max_freq_log2)), cos(x^(2^max_freq_log2))], 共2*num_freqs个
+        - num_freqs: 使用periodic_fns得到升维次数(原始数据的1个另算), [0, max_freq_log2] 共 num_freqs 个
+            即[sin(x*(2^0)), cos(x*(2^0)), ..., sin(x*(2^max_freq_log2)), cos(x*(2^max_freq_log2))], 共2*num_freqs个
         - max_freq_log2: log2 of max freq. 即下面的32=2^max_freq_log2, 即max_freq_log2=5
         - log_sampling: bool。True则低频多高频少[1,2,4,8,16,32], False则频率均等[1,7.2,13.4,19.6,25.8,32]
         - periodic_fns: 基函数
 
         Note: num_freqs=6, max_freq_log2=6-1, 共2*num_freqs个+1个(include_input=True)
+        
         embed_kwargs = {
             'include_input' : True,
             'input_dims' : 3,
@@ -35,7 +33,13 @@ class Embedder:
             'log_sampling' : True,
             'periodic_fns' : [torch.sin, torch.cos],
         }
-        '''
+
+    create_embedding_fn: 创建基函数 self.embed_fns ，确定输出维度 self.out_dim
+        
+    embed(inputs): 是真正升维， 调用 self.embed_fns(inputs) ，对输入数据生成升维的结果。
+        
+    '''
+    def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.create_embedding_fn()
         
@@ -69,13 +73,17 @@ class Embedder:
 
 def get_embedder(multires, i=0):
     '''
-    
+    采用某个配置的 Emedder， 并对其升维调用进一步包装
+
+    >>> embed_fn, input_ch = get_embedder(10, 0)
+        x = embed_fn(x)
+        ch = input_ch
     '''
     if i == -1:
         return nn.Identity(), 3
     
     embed_kwargs = {
-                'include_input' : True,
+                'include_input' : True,     # positional encoding的结果还cat了原始输入的低频信号，这就是同原版position encoding的不同之处。
                 'input_dims' : 3,
                 'max_freq_log2' : multires-1,
                 'num_freqs' : multires,
@@ -102,7 +110,7 @@ class NeRF(nn.Module):
         self.input_ch = input_ch
         # 输入的方向
         self.input_ch_views = input_ch_views
-        # 残差链接
+        # skip connection (这里不是残差连接)
         self.skips = skips
         self.use_viewdirs = use_viewdirs
         
@@ -135,7 +143,7 @@ class NeRF(nn.Module):
         for i, l in enumerate(self.pts_linears):
             h = self.pts_linears[i](h)
             h = F.relu(h)
-            # 没问题，因为pts_linears加入了输入层，所以下标4的MLP其实位置是下标5
+            # 下标4, 正为下标5的层准备输入
             if i in self.skips:
                 h = torch.cat([input_pts, h], -1)
 

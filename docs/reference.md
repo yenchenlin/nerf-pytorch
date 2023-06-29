@@ -9,3 +9,5 @@
 [NeRF论文复现](https://enigmatisms.github.io/2022/03/27/NeRF%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0/)
 
 [Scratchapixel 3.0](https://www.scratchapixel.com/index.html)
+
+[NeRF神经辐射场学习笔记（二）——Pytorch版NeRF实现以及代码注释](https://blog.csdn.net/weixin_44292547/article/details/126249933)

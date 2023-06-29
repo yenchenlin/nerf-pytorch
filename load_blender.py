@@ -35,6 +35,14 @@ def pose_spherical(theta, phi, radius):
 
 
 def load_blender_data(basedir, half_res=False, testskip=1):
+    '''
+    return:
+        imgs: [N, H, W, C]
+        poses: [N, 4, 4]
+        render_poses: [40, 4, 4]
+        [H, W, focal]
+        i_split
+    '''
     splits = ['train', 'val', 'test']
     metas = {}
     for s in splits:
@@ -72,6 +80,7 @@ def load_blender_data(basedir, half_res=False, testskip=1):
     camera_angle_x = float(meta['camera_angle_x'])
     focal = .5 * W / np.tan(.5 * camera_angle_x)
     
+    # [-180., -171., ...,  171.] 每隔9度，共40个角度。
     render_poses = torch.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180,180,40+1)[:-1]], 0)
     
     if half_res:
