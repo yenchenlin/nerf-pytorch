@@ -1,3 +1,27 @@
+
+## First Impression
+
+
+根据给定一个场景的若干张图片，重构出这个场景的3D表示，然后推理的时候输入不同视角就可以合成（渲染）这个视角下的图像了。
+
+可以理解为把一个空间朝一个方向上拍扁，空间中的颜色加权求和得到平面上的颜色。
+
+如果表示一点处不同方向的颜色？方向有无数个，那么要存储无穷个方向的颜色吗？答案是，球谐函数，用来表示同一位置处不同方向的颜色。
+[球谐函数介绍（Spherical Harmonics）](https://zhuanlan.zhihu.com/p/351289217)
+
+## Parts
+
+1. [configs](./configs.md)
+2. load data
+   [blender](./blender.md)
+   [llff](./llff.md)
+   [rays](./rays.md)
+3. [model](./model.md)
+4. [render](./render.md)
+   
+
+## Reference
+
 [体积云渲染实战：ray marching，体积云与体积云光照](https://blog.csdn.net/weixin_44176696/article/details/113090350)
 
 [NeRF 源码分析解读（一）](https://blog.csdn.net/qq_41071191/article/details/125440451)
