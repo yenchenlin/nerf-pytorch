@@ -1,4 +1,5 @@
 - [NeRF model](#nerf-model)
+  - [create\_nerf](#create_nerf)
 ---
 
 
@@ -40,3 +41,8 @@ class NeRF(nn.Module):
 ```
 
 `output_ch = 5 if args.N_importance > 0 else 4` 只在不使用方向时`use_viewdirs=False`有效果，正常使用方向时就是4.
+
+
+## create_nerf
+
+![图 4](../images/7efe5124adc88aee91b5e3d382362233b7b3b49de3b5d605e498a957937f4e2f.png)  

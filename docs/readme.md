@@ -18,7 +18,14 @@
    [rays](./rays.md)
 3. [model](./model.md)
 4. [render](./render.md)
-   
+
+![图 2](../images/15935ba840da1b163115ba0611ce287d66931a6391fd78c8169115b45d85dac2.png)  
+
+> args.txt, config.txt
+
+`args.txt` 会保存所有的参数，包括临时指定的命令行参数。
+
+`config.txt` 只会当传入 `--configs xxx.txt` 时才会保存， 且只保存原本的 `xxx.txt` 的配置（相当于复制一份）， 不包括被临时指定的命令行参数指定的参数。
 
 ## Reference
 

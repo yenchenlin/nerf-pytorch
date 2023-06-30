@@ -58,6 +58,7 @@ def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
 def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
     """Render rays in smaller minibatches to avoid OOM.
     """
+    # ret means abbreviation of return
     all_ret = {}
     for i in range(0, rays_flat.shape[0], chunk):
         ret = render_rays(rays_flat[i:i+chunk], **kwargs)
@@ -142,8 +143,15 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
 
 def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
     '''
+    渲染多个poses。render()只能渲染单个pose。
+
     Args:
         - `savedir`: 保存 render_poses 的 rgb图片
+        - `render_facto`: 渲染更小的图片
+
+    Return: 可以用来制作视频
+        - `rgbs`
+        - `disps`
     '''
 
     H, W, focal = hwf
@@ -275,7 +283,7 @@ def create_nerf(args):
     return render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer
 
 
-def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=False):
+def  raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=False):
     """Transforms model's predictions to semantically meaningful values.
     Args:
         raw: [num_rays, num_samples along ray, 4]. Prediction from model.
@@ -344,6 +352,7 @@ def render_rays(ray_batch,
       network_query_fn: function used for passing queries to network_fn.
       N_samples: int. Number of different times to sample along each ray.
       retraw: bool. If True, include model's raw, unprocessed predictions.
+        its meaning is the abbreviation of return raw.
       lindisp: bool. If True, sample linearly in inverse depth rather than in depth.
       perturb: float, 0 or 1. If non-zero, each ray is sampled at stratified
         random points in time.

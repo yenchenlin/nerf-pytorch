@@ -1,5 +1,14 @@
+- [1. render](#1-render)
+  - [1.1. equations](#11-equations)
+  - [1.2. code](#12-code)
+    - [1.2.1. render](#121-render)
+    - [1.2.3. render\_rays](#123-render_rays)
+    - [1.2.2. raw2outputs](#122-raw2outputs)
 
-## 4.2. render
+
+---
+# 1. render
+## 1.1. equations
 
 > 推导：连续积分中 $\sigma$在离散求和之后变成了 $1-\exp(\sigma)$
 
@@ -81,16 +90,29 @@ $$
 ![图 1](../images/3c507798d267321eb2e8497b05d51f0163f7abb425f4231fd3e8145a53e80bed.png)  
 
 
-![图 1](../images/2ffc51527299c38302924a74d5bbf66a39051bef35738e98adb30aac09d15218.png)  
+![图 1](../images/2ffc51527299c38302924a74d5bbf66a39051bef35738e98adb30aac09d15218.png)
 
 
+## 1.2. code
+
+### 1.2.1. render
+
+![图 9](../images/508075e6bc620a721e06bd1a6c6238750758690d98c8eb1a34a299c430b19ae9.png)  
+
+### 1.2.3. render_rays
+
+![图 8](../images/7199044af2b4a9b35da4a8f31f8901366068bc6372e75f59696dd27f9e3230f4.png)  
+
+
+`render_kwargs_test` 会去除随机性。
 ```python
-def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
-                  near=0., far=1.,
-                  use_viewdirs=False, c2w_staticcam=None,
-                  **kwargs):
-rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, rays=batch_rays,
-                                                verbose=i < 10, retraw=True,
-                                                **render_kwargs_train)
+render_kwargs_test['perturb'] = False
+render_kwargs_test['raw_noise_std'] = 0.
 ```
 
+
+`sample_pdf()`: 逆采样 
+
+### 1.2.2. raw2outputs
+
+![图 7](../images/dd24e119dca965ef5a80d263dddd881bbbc65333bafc511db09f6b13c847d1e7.png)  
