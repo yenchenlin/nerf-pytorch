@@ -1,3 +1,12 @@
+# What is the difference between the origin code and forked code
+
+## tensorboard
+
+add tensorboard for
+- loss of iteration for train
+- configargparse 的 `i_img`  启用, show the img of rgb, disp, acc
+
+
 ## outputch
 
 <https://github.com/yenchenlin/nerf-pytorch/issues/22>
