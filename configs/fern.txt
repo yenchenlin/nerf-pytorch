@@ -1,6 +1,6 @@
 expname = fern_test
 basedir = ./logs
-datadir = ./nerf_example_data/nerf_llff_data/fern
+datadir = ./data/nerf_llff_data/fern
 dataset_type = llff
 
 factor = 8
