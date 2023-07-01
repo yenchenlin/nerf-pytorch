@@ -17,9 +17,9 @@
 ---
 ## 1. 物像关系
 
-![图 16](../images/b3907e4ae3b5cf7e2ad5b2f5a29ad448f277b5479e20c1b95cd299c2ce656126.png)  
+![图 16](../../images/b3907e4ae3b5cf7e2ad5b2f5a29ad448f277b5479e20c1b95cd299c2ce656126.png)  
 
-![图 17](../images/df934186093fafd9f9590af9a0e32b5c441cceda3cedc23f6ab242324051a987.png)  
+![图 17](../../images/df934186093fafd9f9590af9a0e32b5c441cceda3cedc23f6ab242324051a987.png)  
 
 
 $\dfrac{1}{f} = \dfrac{1}{z_0} + \dfrac{1}{z_i}$
@@ -34,19 +34,19 @@ f为焦距， $z_0$为物距（物体到透镜的距离）， $z_i$为像距（�
 
 > 当传感器大小固定时，焦距越短，FOV越大；焦距越长，FOV越小。
 
-![图 11](../images/ee747b21ed49adc9a8a76c96dfca5e6906b09dfed5bb16818d20f47af7f91a6d.png)
+![图 11](../../images/ee747b21ed49adc9a8a76c96dfca5e6906b09dfed5bb16818d20f47af7f91a6d.png)
 
 > 当焦距固定时，传感器大小越小，FOV越小。
 
-![图 14](../images/cb9e61b95bb327af9712617afd7ac0de986308aeb7bc522376dddd29d8235b98.png)  
+![图 14](../../images/cb9e61b95bb327af9712617afd7ac0de986308aeb7bc522376dddd29d8235b98.png)  
 
 
 > 公式就是tan三角函数联系起焦距与高宽、或物距与物高宽。
 
-![图 1](../images/42233c45b2aac9127c39b30870163a7a6cf81a6e7bb3da56bc8c1d73973a5155.png)  
+![图 1](../../images/42233c45b2aac9127c39b30870163a7a6cf81a6e7bb3da56bc8c1d73973a5155.png)  
 
 
-![图 1](../images/2db836f5a66a8f1a2111baafb5742a7a286a6c8225ec8e6db47c299d391556fc.png)  
+![图 1](../../images/2db836f5a66a8f1a2111baafb5742a7a286a6c8225ec8e6db47c299d391556fc.png)  
 
 W是图像的宽度（传感器大小），$\omega$是x轴的视角宽度，f是焦距。
 ```python
@@ -60,17 +60,17 @@ focal = .5 * W / np.tan(.5 * camera_angle_x)
 
 > 镜头参数
 
-![图 12](../images/53da8b7cab4fd935b085033322fe5dd77aa8b274a90dabff368d2862238f5b09.png)  
+![图 12](../../images/53da8b7cab4fd935b085033322fe5dd77aa8b274a90dabff368d2862238f5b09.png)  
 
 我们以35mm-format的底片大小为标准，17mm、50mm、200mm、28mm的焦距是在这样大小的底片上，这个焦距是等效的虚指。意思是，实际手机镜头的焦距很小，对应的也是很小的底片大小。
 
 拍照的效果就是，视场越窄，镜头拍到的就越远。
 
-![图 13](../images/e2954d730381f66ae2b5dbef7c487b20f207d99d59d28ed24d7a42afe1fe965c.png)  
+![图 13](../../images/e2954d730381f66ae2b5dbef7c487b20f207d99d59d28ed24d7a42afe1fe965c.png)  
 
 > maintain same FOV
 
-![图 15](../images/0cb82c87d007dc87a7a461bd68515b29d8bd636eaf55de47619228a3af050c1c.png)  
+![图 15](../../images/0cb82c87d007dc87a7a461bd68515b29d8bd636eaf55de47619228a3af050c1c.png)  
 
 
 ## 3. 相机参数
@@ -94,7 +94,7 @@ focal = .5 * W / np.tan(.5 * camera_angle_x)
 
 $K = \begin{bmatrix} \alpha f_x & s & c_x\\ 0 & \beta f_y & c_y\\ 0 & 0 & 1\end{bmatrix}$
 
-![图 28](../images/c0e0f29877a99b74141b06fbb558c3df63057f9f80a95dcd53abb91ab9876c7c.png)  
+![图 28](../../images/c0e0f29877a99b74141b06fbb558c3df63057f9f80a95dcd53abb91ab9876c7c.png)  
 
 平移操作放在最后（即最左）。
 
@@ -126,8 +126,8 @@ c2w的含义: camera's pose matrix
 
 c2w矩阵是一个4x4的矩阵，左上角3x3是旋转矩阵R，又上角的3x1向量是平移向量T。有时写的时候可以忽略最后一行[0,0,0,1]。
 
-![图 6](../images/1d0fc5c458d0b57f2cec5dc3607ddb3344d04b0477efe23591bb0b3a9a3283a2.png)  
-![图 20](../images/26b6e238263ccbdcaf06b66cd3523e78f577173a178940a98a0f1ea7c5395b21.png)  
+![图 6](../../images/1d0fc5c458d0b57f2cec5dc3607ddb3344d04b0477efe23591bb0b3a9a3283a2.png)  
+![图 20](../../images/26b6e238263ccbdcaf06b66cd3523e78f577173a178940a98a0f1ea7c5395b21.png)  
 
 - R
     $R \in SO(3)$
@@ -140,7 +140,7 @@ c2w矩阵是一个4x4的矩阵，左上角3x3是旋转矩阵R，又上角的3x1�
     $SE(n) = \left\{T=\begin{bmatrix}R & t\\ 0^T & 1\end{bmatrix} \in \R^{4\times 4}|R\in SO(3),t\in \R^3\right\}$
 
 
-![图 7](../images/c2b2c7aff71ab6c0053f2367b48b604c39093e0134a9f8d8f2b46afc01b6b0d0.png) 
+![图 7](../../images/c2b2c7aff71ab6c0053f2367b48b604c39093e0134a9f8d8f2b46afc01b6b0d0.png) 
 
 The camera's extrinsic matrix describes the camera's location in the world, and what direction it's pointing
 
@@ -152,7 +152,7 @@ The camera's extrinsic matrix describes the camera's location in the world, and 
 
 - 意义：将相机坐标系与世界坐标系的转换分解为旋转和平移的过程。
 
-    ![图 5](../images/ee3d0db691dffa4d96f9ffcaabf9cb0e52ac6a3ded1da48014924c67fb1d696f.png)  
+    ![图 5](../../images/ee3d0db691dffa4d96f9ffcaabf9cb0e52ac6a3ded1da48014924c67fb1d696f.png)  
 
     描述点B。在绿色坐标系下，B点(1,2)。在蓝色坐标系下，B点(2,2)。怎么转化？借助向量。
 
@@ -160,7 +160,7 @@ The camera's extrinsic matrix describes the camera's location in the world, and 
     也即A点(0,1)和B点(2,2)=(1,2)-(-1,0)。
     怎么做到从绿色到蓝色？旋转坐标系，方向向量(2,1)变化为(1,2)，平移向量(-1,0)就是在绿色坐标系下观察的世界坐标系原点的位置。
 
-    ![图 6](../images/a3b6257693f7e85d96f84d846a740dac3f521287df3779978b9079484f8d3203.png)  
+    ![图 6](../../images/a3b6257693f7e85d96f84d846a740dac3f521287df3779978b9079484f8d3203.png)  
 
     相机坐标系虚线坐标轴，世界坐标系彩色坐标轴。相机坐标的黑色OA，选转后世界坐标的OB，在相机坐标下看世界坐标原点的平移量是粉色的OO'，世界坐标的O'C = OB - OO'。
 
@@ -174,7 +174,7 @@ The camera's extrinsic matrix describes the camera's location in the world, and 
 ## 4. 坐标系
 坐标系 Coordinate Frames
 
-![图 4](../images/f543774d2d57cb991abf472608bf10221a356f9e287b95aad9a49a5d7548670f.png)  
+![图 4](../../images/f543774d2d57cb991abf472608bf10221a356f9e287b95aad9a49a5d7548670f.png)  
 
 Express motion information relative to a reference frame. 
 
@@ -189,12 +189,12 @@ Express motion information relative to a reference frame.
 
 三指：右手，大拇指a，食指b，中指的方向就是axb。（是大食中、食中大、中大食的升序，而不是中食大等的降序）
 
-![图 2](../images/e64bdd1708f9aaa11f38fd1efd544325dac5aee40d904accfee17c096283c59e.png)  
+![图 2](../../images/e64bdd1708f9aaa11f38fd1efd544325dac5aee40d904accfee17c096283c59e.png)  
 
 
 > 将左右手性和right-up-forward联系在一起，而不是xyz
 
-![图 3](../images/e8c52001b6f627664240997c2677db5bb989c04d4ada4e4dcaa433de12a624af.png)  
+![图 3](../../images/e8c52001b6f627664240997c2677db5bb989c04d4ada4e4dcaa433de12a624af.png)  
 
 图中b还是右手性，是认为up是z轴，按照right-up-forward来判断它还是右手性。
 
@@ -205,16 +205,16 @@ Currently, the industry standard tends to be the right-hand XYZ coordinate syste
 
 
 
-![图 8](../images/0b2e24a1c6d97650f49d5d02e08f0f244fa60e9a700c62330261ddb30daeb61d.png)  
+![图 8](../../images/0b2e24a1c6d97650f49d5d02e08f0f244fa60e9a700c62330261ddb30daeb61d.png)  
 
 
 
 
-![图 3](../images/d7811eeb810841979e5f8cbd88f6e6d71e2744c4d464081863dd8d93079e2370.png)  
+![图 3](../../images/d7811eeb810841979e5f8cbd88f6e6d71e2744c4d464081863dd8d93079e2370.png)  
 
 
-![图 4](../images/48b46404b809bc67b121791f53db54e68eb85eaec2c3968048c70024f1e81280.png)  
-![图 5](../images/872d8ed4d1075b1b5cadc6434a6987e6d28d73e50a72fcdb8dc49a8cb743a7c6.png)  
+![图 4](../../images/48b46404b809bc67b121791f53db54e68eb85eaec2c3968048c70024f1e81280.png)  
+![图 5](../../images/872d8ed4d1075b1b5cadc6434a6987e6d28d73e50a72fcdb8dc49a8cb743a7c6.png)  
 
 或者
 ```python
@@ -230,7 +230,7 @@ camtoworlds_opengl = camtoworlds_opencv @ np.diag([1, -1, -1, 1])
 
 图像的成像过程经历了世界坐标系—>相机坐标系—>图像坐标系—>像素坐标系这四个坐标系的转换，如下图所示：
 
-![图 21](../images/080cbdb99e930d58e34b77462b1875009c9f9e42dc825a8dbc61d6d2296b527b.png)  
+![图 21](../../images/080cbdb99e930d58e34b77462b1875009c9f9e42dc825a8dbc61d6d2296b527b.png)  
 
 - 像素坐标系 pixels coordinate：以图像平面左上角为原点的坐标系 ，X 轴和Y 轴分别平行于图像坐标系的 X 轴和Y 轴，用 $(u,v)$ 表示其坐标值。像素坐标系就是以像素为单位的图像坐标系。
 
@@ -272,7 +272,7 @@ camtoworlds_opengl = camtoworlds_opencv @ np.diag([1, -1, -1, 1])
 $\begin{bmatrix} R & T \end{bmatrix}
 \begin{bmatrix} \cos(\theta) \\ -\sin(\theta) \\ -\sin(\theta*zrate) \\ 1 \end{bmatrix}$
 
-![图 1](../images/962653656f477ecdb5999f0d3a9108a94d3d07c8a53af8de76055e3d2368f298.png)  
+![图 1](../../images/962653656f477ecdb5999f0d3a9108a94d3d07c8a53af8de76055e3d2368f298.png)  
 
 colmap已经设定好了世界坐标系，外参也是依据此世界坐标系的。
 
@@ -280,11 +280,11 @@ colmap已经设定好了世界坐标系，外参也是依据此世界坐标系�
 
 #### 5.2.1. 相机坐标系<->图像坐标系
 
-![图 18](../images/cdb55d1e17a03b6ffc22e9e3dad8fc263bb6d8bc33cc849254893960c4b1e2c6.png)  
+![图 18](../../images/cdb55d1e17a03b6ffc22e9e3dad8fc263bb6d8bc33cc849254893960c4b1e2c6.png)  
 
 图像坐标系(对应平面叫做image plane)的x和y轴方向和相机坐标系的保持一致。
 
-![图 22](../images/29f0b1870a1da2e77cd3ad296e1e79b07bbc79296d33644be2e64ee34b297e79.png)  
+![图 22](../../images/29f0b1870a1da2e77cd3ad296e1e79b07bbc79296d33644be2e64ee34b297e79.png)  
 
 从3D的相机坐标系下的欧式点 $(X_{c}, Y_{c}, Z_{c})$ 到2D的图像坐标系下的欧式点 $(x,y)$  
 
@@ -307,7 +307,7 @@ $\begin{bmatrix} f_x & 0 & 0\\ 0 & f_y & 0\\ 0 & 0 & 1\end{bmatrix}  \begin{bmat
 
 PS：倒像问题
 
-![图 23](../images/2d8672f8aa24c34bc1097463b893585081be453ffc927c33020f1f21f5d99d43.png)  
+![图 23](../../images/2d8672f8aa24c34bc1097463b893585081be453ffc927c33020f1f21f5d99d43.png)  
 
 P点的x是负坐标，P'点的x是正坐标。
 
@@ -315,11 +315,11 @@ $$\dfrac{f}{Z_{c}} = -\dfrac{x}{X_c} = -\dfrac{y}{Y_C}$$
 
 其中负号表示成的像是倒立的。为了简化模型，我们可以把成像平面对称到相机前方，和三维空间点一起放在摄像机坐标系的同一侧，这样做可以把公式中的负号去掉，使式子更加简洁。
 
-![图 24](../images/59a8c83face6fedb26b184273bccb9433d009275d722a72dae996a5f958c46e7.png)  
+![图 24](../../images/59a8c83face6fedb26b184273bccb9433d009275d722a72dae996a5f958c46e7.png)  
 
 #### 5.2.2. 图像坐标系<->像素坐标系
 
-![图 27](../images/d2019bb8a07eeb32e230a28112f6751b5022826038a05d059debcf03c79defa4.png)  
+![图 27](../../images/d2019bb8a07eeb32e230a28112f6751b5022826038a05d059debcf03c79defa4.png)  
 
 
 像素坐标系：以左上角点为原点，u轴向右与x轴平行，v轴向右与y轴平行。像素坐标系和图像坐标系之间，相差了一个缩放 $\alpha, \beta$和原点的平移 $c_x, c_y$。
@@ -336,7 +336,7 @@ $
 
 ### 5.3. 综合
 
-![图 26](../images/b899ce078ef1a11a8bdc6fdde427448eaecbada3eb4ffa9557a90a3afac8dd66.png) 
+![图 26](../../images/b899ce078ef1a11a8bdc6fdde427448eaecbada3eb4ffa9557a90a3afac8dd66.png) 
 
 $ Z_c\begin{bmatrix} u \\ v \\ 1\end{bmatrix} = KM_{w2c}P_w = K\left( R\begin{bmatrix} X_w \\ Y_w \\ Z_w \end{bmatrix} + t \right)$
 
@@ -382,7 +382,7 @@ $ Z_c\begin{bmatrix} u \\ v \\ 1\end{bmatrix} = KM_{w2c}P_w = K\left( R\begin{bm
 
 w2c 可以通过 c2w 的逆
 
-![图 19](../images/2ee73e3e3e12cbd3c6038ada97006e0e0963cf7049df0fc9df2704e66e8bccd9.png)  
+![图 19](../../images/2ee73e3e3e12cbd3c6038ada97006e0e0963cf7049df0fc9df2704e66e8bccd9.png)  
 
 - c2w: $M_{c2w} = [R, t]$
 

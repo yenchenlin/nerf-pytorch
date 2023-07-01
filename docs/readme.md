@@ -9,15 +9,18 @@
 如果表示一点处不同方向的颜色？方向有无数个，那么要存储无穷个方向的颜色吗？答案是，球谐函数，用来表示同一位置处不同方向的颜色。
 [球谐函数介绍（Spherical Harmonics）](https://zhuanlan.zhihu.com/p/351289217)
 
-## Parts
+## Train()
 
 1. [configs](./configs.md)
 2. load data
-   [blender](./blender.md)
-   [llff](./llff.md)
-   [rays](./rays.md)
+   [colmap](./dataset/colmap.md)
+   [blender](./dataset/blender.md)
+   [llff](./dataset/llff.md)
+   [rays](./dataset/rays.md)
 3. [model](./model.md)
-4. [render](./render.md)
+4. iterations
+   [iterations](./iterations.md)
+   [render](./render.md)
 
 ![图 2](../images/15935ba840da1b163115ba0611ce287d66931a6391fd78c8169115b45d85dac2.png)  
 

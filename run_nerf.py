@@ -1,15 +1,12 @@
-import os, sys
+import os
 import numpy as np
 import imageio
-import json
-import random
 import time
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
 
-import matplotlib.pyplot as plt
 
 from run_nerf_helpers import *
 
@@ -18,7 +15,7 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
@@ -92,12 +89,12 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
       c2w_staticcam: array of shape [3, 4]. If not None, use this transformation matrix for 
        camera while using other c2w argument for viewing directions.
 
-    Returns:
+    Returns: Tensor
         rgb_map: [batch_size, 3]. Predicted RGB values for rays.
-        
         disp_map: [batch_size]. Disparity map. Inverse of depth.
         acc_map: [batch_size]. Accumulated opacity (alpha) along a ray.
-        extras: dict with everything returned by render_rays(). 
+        extras: dict with everything returned by render_rays(). { 'raw' | 'rgb0', 'disp0', 'acc0', 'z_std' }       
+
     """
     if c2w is not None:
         # special case to render full image
@@ -143,13 +140,13 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
 
 def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
     '''
-    渲染多个poses。render()只能渲染单个pose。
+    渲染多个poses， 可以用来制作视频。render()只能渲染单个pose。
 
     Args:
         - `savedir`: 保存 render_poses 的 rgb图片
         - `render_facto`: 渲染更小的图片
 
-    Return: 可以用来制作视频
+    Return: Ndarry
         - `rgbs`
         - `disps`
     '''
@@ -165,15 +162,12 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
     rgbs = []
     disps = []
 
-    t = time.time()
     for i, c2w in enumerate(tqdm(render_poses)):
-        print(i, time.time() - t)
-        t = time.time()
         rgb, disp, acc, _ = render(H, W, K, chunk=chunk, c2w=c2w[:3,:4], **render_kwargs)
         rgbs.append(rgb.cpu().numpy())
         disps.append(disp.cpu().numpy())
         if i==0:
-            print(rgb.shape, disp.shape)
+            tqdm.write(f"rgb.shape = {rgb.shape}, disp.shape = {disp.shape}")
 
         """
         if gt_imgs is not None and render_factor==0:
@@ -206,7 +200,8 @@ def create_nerf(args):
         # 位置编码 direction，由3维变成27维度。
         # 27 = 3 + （2 * 4）* 3 = 原本diretion的三维度表示 + （sin, cos 4次）* 3维度
         embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed)
-    output_ch = 5 if args.N_importance > 0 else 4
+    # MODIFY
+    output_ch = 4
     skips = [4]
     model = NeRF(D=args.netdepth, W=args.netwidth,
                  input_ch=input_ch, output_ch=output_ch, skips=skips,
@@ -283,7 +278,7 @@ def create_nerf(args):
     return render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer
 
 
-def  raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=False):
+def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=False):
     """Transforms model's predictions to semantically meaningful values.
     Args:
         raw: [num_rays, num_samples along ray, 4]. Prediction from model.
@@ -562,6 +557,9 @@ def train():
     parser = config_parser()
     args = parser.parse_args()
 
+    writer = SummaryWriter()
+
+
     # Load data
     K = None
     if args.dataset_type == 'llff':
@@ -768,6 +766,7 @@ def train():
                 if i < args.precrop_iters:
                     dH = int(H//2 * args.precrop_frac)
                     dW = int(W//2 * args.precrop_frac)
+                    # shape: (2dH, 2dW)，即2dW个横坐标，2dH个纵坐标。
                     coords = torch.stack(
                         torch.meshgrid(
                             torch.linspace(H//2 - dH, H//2 + dH - 1, 2*dH), 
@@ -827,17 +826,17 @@ def train():
                 'network_fine_state_dict': render_kwargs_train['network_fine'].state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
             }, path)
-            print('Saved checkpoints at', path)
+            print(f'Saved checkpoints at {path}\n')
 
         # save video (rgb and disparity) of render_poses
         if i%args.i_video==0 and i > 0:
             # Turn on testing mode
             with torch.no_grad():
                 rgbs, disps = render_path(render_poses, hwf, K, args.chunk, render_kwargs_test)
-            print('Done, saving', rgbs.shape, disps.shape)
-            moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
+            moviebase = os.path.join(basedir, expname, 'render_poses_{:06d}_'.format(i))
             imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
             imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.max(disps)), fps=30, quality=8)
+            print('Done, saved render poses\n')
 
             # if args.use_viewdirs:
             #     render_kwargs_test['c2w_staticcam'] = render_poses[0][:3,:4]
@@ -848,58 +847,53 @@ def train():
 
         # poses[i_test]
         if i%args.i_testset==0 and i > 0:
-            testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
+            testsavedir = os.path.join(basedir, expname, 'test_poses_{:06d}'.format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
             with torch.no_grad():
                 render_path(torch.Tensor(poses[i_test]).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
-            print('Saved test set')
+            print('Done, saved test poses\n')
 
 
-    
+        # print
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
+
         """
             print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
             print('iter time {:.05f}'.format(dt))
-
-            with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_print):
-                tf.contrib.summary.scalar('loss', loss)
-                tf.contrib.summary.scalar('psnr', psnr)
-                tf.contrib.summary.histogram('tran', trans)
-                if args.N_importance > 0:
-                    tf.contrib.summary.scalar('psnr0', psnr0)
-
-
-            if i%args.i_img==0:
-
-                # Log a rendered validation view to Tensorboard
-                img_i=np.random.choice(i_val)
-                target = images[img_i]
-                pose = poses[img_i, :3,:4]
-                with torch.no_grad():
-                    rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
-                                                        **render_kwargs_test)
-
-                psnr = mse2psnr(img2mse(rgb, target))
-
-                with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
-
-                    tf.contrib.summary.image('rgb', to8b(rgb)[tf.newaxis])
-                    tf.contrib.summary.image('disp', disp[tf.newaxis,...,tf.newaxis])
-                    tf.contrib.summary.image('acc', acc[tf.newaxis,...,tf.newaxis])
-
-                    tf.contrib.summary.scalar('psnr_holdout', psnr)
-                    tf.contrib.summary.image('rgb_holdout', target[tf.newaxis])
-
-
-                if args.N_importance > 0:
-
-                    with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
-                        tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
-                        tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis,...,tf.newaxis])
-                        tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis,...,tf.newaxis])
         """
+        
+        # tensorboard
+        writer.add_scalar('train/psnr', psnr, i)
+        writer.add_scalar('train/loss', loss, i)
+        if i%args.i_img==0:
+            img_i=np.random.choice(i_val)
+            with torch.no_grad():
+                rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, c2w=torch.Tensor(poses[img_i]).to(device),
+                                        verbose=i < 10, retraw=True,
+                                        **render_kwargs_test)
+
+            writer.add_image('val/rgb', rgb, i, dataformats='HWC')
+            writer.add_image('val/disp', disp, i, dataformats='HW')
+            writer.add_image('val/acc', acc, i, dataformats='HW')
+            writer.add_image('val/target_s', images[img_i], i, dataformats='HWC')
+
+            if args.N_importance > 0:
+                writer.add_image('val/rgb0', extras['rgb0'], i, dataformats='HWC')
+                writer.add_image('val/disp0', extras['disp0'], i, dataformats='HW')
+                writer.add_image('val/acc0', extras['acc0'], i, dataformats='HW')
+                writer.add_image('val/z_std', extras['z_std'], i, dataformats='HW')
+            # writer.add_image('val/rgb', to8b(rgb), i, dataformats='HWC')
+            # writer.add_image('val/disp', to8b(disp), i, dataformats='HW')
+            # writer.add_image('val/acc', to8b(acc), i, dataformats='HW')
+            # writer.add_image('val/target_s', to8b(images[img_i]), i, dataformats='HWC')
+
+            # if args.N_importance > 0:
+            #     writer.add_image('val/rgb0', to8b(extras['rgb0']), i, dataformats='HWC')
+            #     writer.add_image('val/disp0', to8b(extras['disp0']), i, dataformats='HW')
+            #     writer.add_image('val/acc0', to8b(extras['acc0']), i, dataformats='HW')
+            #     writer.add_image('val/z_std', to8b(extras['z_std']), i, dataformats='HW')
 
         global_step += 1
 

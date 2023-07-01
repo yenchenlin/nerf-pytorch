@@ -35,14 +35,17 @@ class NeRF(nn.Module):
         input_ch=3,             # x,y,z
         input_ch_views=3,       # direction的三维表示
         output_ch=4,            # rgb和sigma
-        skips=[4],              # 残差
+        skips=[4],              # skip connnect（不是残差）, 第六个MLP（不是第4，第5）
         use_viewdirs=False 
     ):
 ```
 
-`output_ch = 5 if args.N_importance > 0 else 4` 只在不使用方向时`use_viewdirs=False`有效果，正常使用方向时就是4.
+![图 11](../images/362834bb2aef579ae8ef60154b54951ba9058c268e9ba4fb6a3cbaf415fdccc0.png)  
 
+> Paper: a skip connection that concatenates this input to the fifth layer’s activation
 
+这个图的示意不是第五层的输入加入了x，而是x和第五层的输出concatenate起来给第六层。
 ## create_nerf
 
 ![图 4](../images/7efe5124adc88aee91b5e3d382362233b7b3b49de3b5d605e498a957937f4e2f.png)  
+

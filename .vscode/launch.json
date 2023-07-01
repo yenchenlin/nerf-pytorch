@@ -10,6 +10,26 @@
             "args": [
                 "--config", "configs/lego.txt"
             ]
+        },
+        {
+            "name": "debug",
+            "type": "python",
+            "request": "launch",
+            "program": "run_nerf.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "logs/configs/mic.txt"
+            ]
+        },
+        {
+            "name": "debug2",
+            "type": "python",
+            "request": "launch",
+            "program": "run_nerf.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "logs/configs/mic_pre.txt"
+            ]
         }
     ]
 }

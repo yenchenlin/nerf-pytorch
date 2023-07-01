@@ -117,7 +117,7 @@ class NeRF(nn.Module):
         # 一共8个输出维度是256的MLP，下面的下标是pts_linears中的，而不是for循环中的
         # 下标0输入层MLP：[nn.Linear(input_ch, W)]
         # 下标1,2,3,4,6,7的MLP: nn.Linear(W, W)
-        # 下标5的残差MLP：nn.Linear(W + input_ch, W)
+        # 下标5(第6个)的残差MLP：nn.Linear(W + input_ch, W)
         self.pts_linears = nn.ModuleList(
             [nn.Linear(input_ch, W)] + [nn.Linear(W, W) if i not in self.skips else nn.Linear(W + input_ch, W) for i in range(D-1)])
         

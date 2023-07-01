@@ -5,3 +5,4 @@ nerf_example_data/*
 configs/*
 data/*
 !data
+runs

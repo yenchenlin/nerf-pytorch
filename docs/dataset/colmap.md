@@ -39,7 +39,7 @@ Assuming you stored the images of your project in the following structure:
 2. select `path/to/project` as a **workspace folder**, select `path/to/project/images` as a **image folder**。
     注意：不是`images_4`，用原始大小的。因为`_load_data`计算poses和bds时会除以传入的factor=4，所以colmap就该选没被处理过的原始图片。
 
-    ![图 9](../images/fdbb210f4f500fb0c415d7409299dec566d49ccb6d32e9d1e27e9a845cd5338f.png)  
+    ![图 9](../../images/fdbb210f4f500fb0c415d7409299dec566d49ccb6d32e9d1e27e9a845cd5338f.png)  
 
 3. The output is written to the workspace folder. The folder would look similar to this:
 ```bash
@@ -64,11 +64,12 @@ Assuming you stored the images of your project in the following structure:
 │   +── ...
 +── database.db
 ```
-![图 10](../images/29453f61b3aeea97a48e4bb4c799e685c2824ffb49bbdcf10507b24c7c4854fc.png)  
+![图 10](../../images/29453f61b3aeea97a48e4bb4c799e685c2824ffb49bbdcf10507b24c7c4854fc.png)  
 可以去掉Dense model，因为nerf用不到。
 
 我们要的结果：
 - `sparse/0/`下的`cameras.bin`, `images.bin`, `points3D.bin`
+- 这三个东西传递给 `imgs2poses.py` 来根据其生成`poses_bounds.npy`（这个和输入的`factor`没有关系）
 ### 2.2. cli
 
 The command for the automatic reconstruction tool would be:
