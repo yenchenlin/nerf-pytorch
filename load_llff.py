@@ -1,5 +1,9 @@
 import numpy as np
-import os, imageio
+import os
+import imageio as iio
+from PIL import Image
+from torchvision import transforms as T
+
 
 
 ########## Slightly modified version of LLFF data loading code 
@@ -45,7 +49,7 @@ def _minify(basedir, factors=[], resolutions=[]):
         check_output('cp {}/* {}'.format(imgdir_orig, imgdir), shell=True)
         
         ext = imgs[0].split('.')[-1]
-        args = ' '.join(['mogrify', '-resize', resizearg, '-format', 'png', '*.{}'.format(ext)])
+        args = ' '.join(['magick mogrify', '-resize', resizearg, '-format', 'png', '*.{}'.format(ext)])
         print(args)
         os.chdir(imgdir)
         check_output(args, shell=True)
@@ -67,7 +71,7 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     
     img0 = [os.path.join(basedir, 'images', f) for f in sorted(os.listdir(os.path.join(basedir, 'images'))) \
             if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')][0]
-    sh = imageio.imread(img0).shape
+    sh = iio.imread(img0).shape
     
     sfx = ''
     
@@ -98,7 +102,7 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
         print( 'Mismatch between imgs {} and poses {} !!!!'.format(len(imgfiles), poses.shape[-1]) )
         return
     
-    sh = imageio.imread(imgfiles[0]).shape
+    sh = iio.imread(imgfiles[0]).shape
     poses[:2, 4, :] = np.array(sh[:2]).reshape([2, 1])
     poses[2, 4, :] = poses[2, 4, :] * 1./factor
     
@@ -107,9 +111,9 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     
     def imread(f):
         if f.endswith('png'):
-            return imageio.imread(f, ignoregamma=True)
+            return iio.imread(f, format='PNG-PIL', ignoregamma=True)
         else:
-            return imageio.imread(f)
+            return iio.imread(f)
         
     imgs = imgs = [imread(f)[...,:3]/255. for f in imgfiles]
     imgs = np.stack(imgs, -1)  
@@ -240,7 +244,7 @@ def spherify_poses(poses, bds):
     return poses_reset, new_poses, bds
     
 
-def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False):
+def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False, test=False, render_spiral=False, maskdir=''):
     
 
     poses, bds, imgs = _load_data(basedir, factor=factor) # factor=8 downsamples original imgs by 8x
@@ -250,6 +254,23 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
     poses = np.concatenate([poses[:, 1:2, :], -poses[:, 0:1, :], poses[:, 2:, :]], 1)
     poses = np.moveaxis(poses, -1, 0).astype(np.float32)
     imgs = np.moveaxis(imgs, -1, 0).astype(np.float32)
+
+    # Mask here
+    mask = []
+    if maskdir:
+        mask = Image.open(maskdir).convert('L')
+
+        mask_w, mask_h = mask.size
+        mask_w = mask_w // factor
+        mask_h = mask_h // factor
+        mask = mask.resize((mask_w, mask_h), Image.Resampling.LANCZOS)
+
+        mask = np.array(mask) / 255
+        mask = np.broadcast_to(mask, (len(imgs), mask_w, mask_h))
+        mask = mask[:,:,:, np.newaxis]
+
+        imgs = imgs * mask
+
     images = imgs
     bds = np.moveaxis(bds, -1, 0).astype(np.float32)
     
@@ -296,8 +317,12 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
             N_rots = 1
             N_views/=2
 
-        # Generate poses for spiral path
-        render_poses = render_path_spiral(c2w_path, up, rads, focal, zdelta, zrate=.5, rots=N_rots, N=N_views)
+        
+        if render_spiral:
+            # Generate poses for spiral path
+            render_poses = render_path_spiral(c2w_path, up, rads, focal, zdelta, zrate=.5, rots=N_rots, N=N_views)
+        else:
+            render_poses = poses
         
         
     render_poses = np.array(render_poses).astype(np.float32)
@@ -307,13 +332,18 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
     print(poses.shape, images.shape, bds.shape)
     
     dists = np.sum(np.square(c2w[:3,3] - poses[:,:3,3]), -1)
-    i_test = np.argmin(dists)
+
+    if test:
+        i_test = []
+    else:
+        i_test = np.argmin(dists)
     print('HOLDOUT view is', i_test)
     
     images = images.astype(np.float32)
     poses = poses.astype(np.float32)
 
-    return images, poses, bds, render_poses, i_test
+    ## Return poses as render_poses
+    return images,mask, poses, bds, poses, i_test
 
 
 

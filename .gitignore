@@ -1,4 +1,5 @@
 **/.ipynb_checkpoints
+configs/knees/*
 **/__pycache__
 *.png
 *.mp4
