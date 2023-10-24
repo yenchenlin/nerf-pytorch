@@ -803,7 +803,7 @@ def train():
     if args.dataset_type == "llff":
         # --render_path --testdir should test model on given testset and not split, and not train model.
         if args.testdir:
-            images, mask, poses, bds, render_poses, i_test = load_llff_data(
+            images, mask, poses, bds, render_poses, i_test, i_val = load_llff_data(
                 args.testdir,
                 args.factor,
                 recenter=True,
@@ -812,9 +812,10 @@ def train():
                 test=True,
                 render_spiral=args.render_spiral,
                 maskdir=args.maskdir,
+                exp_name=args.expname,
             )
         else:
-            images, mask, poses, bds, render_poses, i_test = load_llff_data(
+            images, mask, poses, bds, render_poses, i_test, i_val = load_llff_data(
                 args.datadir,
                 args.factor,
                 recenter=True,
@@ -822,6 +823,7 @@ def train():
                 spherify=args.spherify,
                 render_spiral=args.render_spiral,
                 maskdir=args.maskdir,
+                exp_name=args.expname,
             )
         hwf = poses[0, :3, -1]
         poses = poses[:, :3, :4]
@@ -842,7 +844,7 @@ def train():
                 print("Auto LLFF holdout,", args.llffhold)
                 i_test = np.arange(images.shape[0])[:: args.llffhold]
 
-            i_val = i_test
+            #i_val = i_test
             i_train = np.array(
                 [
                     i

@@ -1,6 +1,8 @@
+import glob
 import numpy as np
 import os
 import imageio as iio
+import pandas as pd
 from PIL import Image
 from torchvision import transforms as T
 
@@ -242,13 +244,34 @@ def spherify_poses(poses, bds):
     poses_reset = np.concatenate([poses_reset[:,:3,:4], np.broadcast_to(poses[0,:3,-1:], poses_reset[:,:3,-1:].shape)], -1)
     
     return poses_reset, new_poses, bds
-    
 
-def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False, test=False, render_spiral=False, maskdir=''):
+    
+def _load_tsv(basedir, exp_name):
+    if not os.path.exists(os.path.join(basedir, 'tsvs')):
+        raise Exception(f'{basedir}/tsvs does not exist. Try creating it.')
+    
+    tsv_files = glob.glob(os.path.join(basedir,'tsvs', "*.tsv"))
+    # finds tsv file with same name as experiment name
+    dataset_tsv = os.path.join(basedir,'tsvs', f"{exp_name}.tsv")
+    if not dataset_tsv in tsv_files:
+        raise Exception(f'{dataset_tsv} does not exists.')
+
+    files = pd.read_csv(dataset_tsv, sep="\t")
+    files = files[~files["id"].isnull()]  # remove data without id
+    files = files.sort_values(by=['filename'])
+    files.reset_index(inplace=True, drop=True)
+
+
+    return files
+
+
+def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False, test=False, render_spiral=False, maskdir='', exp_name=''):
     
 
     poses, bds, imgs = _load_data(basedir, factor=factor) # factor=8 downsamples original imgs by 8x
     print('Loaded', basedir, bds.min(), bds.max())
+
+    files = _load_tsv(basedir, exp_name)
     
     # Correct rotation matrix ordering and move variable dim to axis 0
     poses = np.concatenate([poses[:, 1:2, :], -poses[:, 0:1, :], poses[:, 2:, :]], 1)
@@ -335,15 +358,17 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
 
     if test:
         i_test = []
+        i_val = []
     else:
-        i_test = np.argmin(dists)
+        i_test = files[files['split'] == 'test'].index.values.tolist()
+        i_val = files[files['split'] == 'val'].index.values.tolist()
     print('HOLDOUT view is', i_test)
     
     images = images.astype(np.float32)
     poses = poses.astype(np.float32)
 
     ## Return poses as render_poses
-    return images,mask, poses, bds, poses, i_test
+    return images,mask, poses, bds, poses, i_test, i_val
 
 
 
