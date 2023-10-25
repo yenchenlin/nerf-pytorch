@@ -68,9 +68,15 @@ def _minify(basedir, factors=[], resolutions=[]):
 def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     
     poses_arr = np.load(os.path.join(basedir, 'poses_bounds.npy'))
-    poses = poses_arr[:, :-2].reshape([-1, 3, 5]).transpose([1,2,0])
+
+    # OPENCV camera model, hwf = [H, W, fx, fy]
+    if poses_arr.shape[-1] == 22:
+        poses = poses_arr[:, :-2].reshape([-1, 4, 5]).transpose([1,2,0])
+    # Camera model with fx=fy, hwf = [H, W, focal]
+    else:
+        poses = poses_arr[:,:-2].reshape([-1,3,5]).transpose([1,2,0])
     bds = poses_arr[:, -2:].transpose([1,0])
-    
+
     img0 = [os.path.join(basedir, 'images', f) for f in sorted(os.listdir(os.path.join(basedir, 'images'))) \
             if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')][0]
     sh = iio.imread(img0).shape
@@ -105,8 +111,15 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
         return
     
     sh = iio.imread(imgfiles[0]).shape
+    # set height and width
     poses[:2, 4, :] = np.array(sh[:2]).reshape([2, 1])
-    poses[2, 4, :] = poses[2, 4, :] * 1./factor
+    # OPENCV model, hwf = [H, W, fx, fy]
+    # Scale both fx and fy
+    if poses_arr.shape[-1] == 22:
+        poses[2:4, 4, :] = poses[2:4, 4, :] * 1./factor
+    # only scale fx, since fx=fy
+    else:
+        poses[2,4,:] = poses[2,4,:] * 1./factor
     
     if not load_imgs:
         return poses, bds
@@ -120,6 +133,7 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     imgs = imgs = [imread(f)[...,:3]/255. for f in imgfiles]
     imgs = np.stack(imgs, -1)  
     
+
     print('Loaded image data', imgs.shape, poses[:,-1,0])
     return poses, bds, imgs
 

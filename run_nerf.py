@@ -170,13 +170,14 @@ def render_path(
     render_factor=0,
     mask=[],
 ):
-    H, W, focal = hwf
 
+    H, W, fx, fy = hwf
     if render_factor != 0:
         # Render downsampled for speed
         H = H // render_factor
         W = W // render_factor
-        focal = focal / render_factor
+        fx = fx / render_factor 
+        fy = fy / render_factor 
 
     rgbs = []
     disps = []
@@ -207,9 +208,7 @@ def render_path(
             gt_img = (
                 gt_imgs[i].cpu().numpy() if torch.is_tensor(gt_imgs[i]) else gt_imgs[i]
             )
-            rgb_img = (
-                rgb_masked if len(mask) else rgb.cpu().numpy()
-            )
+            rgb_img = rgb_masked if len(mask) else rgb.cpu().numpy()
 
             p = -10.0 * np.log10(np.mean(np.square(rgb_img - gt_img)))
             ssim_score = ssim(rgb_img, gt_img, channel_axis=2, data_range=1.0)
@@ -825,8 +824,18 @@ def train():
                 maskdir=args.maskdir,
                 exp_name=args.expname,
             )
-        hwf = poses[0, :3, -1]
+        # OPENCV camera model, hwf = [H, W, fx, fy]
+        if poses.shape[1] == 4:
+            hwf = poses[0, :4, -1]
+        # other camera model, hwf = [H, W, focal]
+        else:
+            hwf = poses[0, :3, -1]
         poses = poses[:, :3, :4]
+
+        """
+        array([[[ 9.9801016e-01,  5.6327268e-02,  2.8338468e-02,  3.1170600e+04,
+          3.6000000e+02],
+        """
 
         mask_exists = len(mask) != 0
 
@@ -844,7 +853,7 @@ def train():
                 print("Auto LLFF holdout,", args.llffhold)
                 i_test = np.arange(images.shape[0])[:: args.llffhold]
 
-            #i_val = i_test
+            # i_val = i_test
             i_train = np.array(
                 [
                     i
@@ -910,14 +919,23 @@ def train():
         return
 
     # Cast intrinsics to right types
-    H, W, focal = hwf
+
+    # OPENCV camera model, fx != fy
+    if len(hwf) == 4:
+        H, W, fx, fy = hwf
+    # other camera model fx = fy
+    else:
+        H, W, focal = hwf
+        fx, fy = focal, focal
+
     H, W = int(H), int(W)
-    hwf = [H, W, focal]
+    hwf = [H, W, fx, fy]
 
     if K is None:
-        K = np.array([[focal, 0, 0.5 * W], [0, focal, 0.5 * H], [0, 0, 1]])
+        K = np.array([[fx, 0, 0.5 * W], [0, fy, 0.5 * H], [0, 0, 1]])
+    # other camera model fx = fy
 
-    if args.render_test and i_test.size:
+    if args.render_test and i_test:
         render_poses = np.array(poses[i_test])
     else:
         render_poses = np.array(poses[i_train])
@@ -932,7 +950,7 @@ def train():
         for arg in sorted(vars(args)):
             attr = getattr(args, arg)
             file.write("{} = {}\n".format(arg, attr))
-            
+
     if args.config is not None:
         f = os.path.join(basedir, expname, "config.txt")
         with open(f, "w") as file:
@@ -958,7 +976,7 @@ def train():
     if args.render_only:
         print("RENDER ONLY")
         with torch.no_grad():
-            if args.render_test and i_test.size:
+            if args.render_test and i_test:
                 # render_test switches to test poses
                 images = images[i_test]
             # else:
@@ -1211,7 +1229,7 @@ def train():
             #     render_kwargs_test['c2w_staticcam'] = None
             #     imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
 
-        if i_test.size and i % args.i_testset == 0 and i > 0:
+        if i_test and i % args.i_testset == 0 and i > 0:
             testsavedir = os.path.join(basedir, expname, "testset_{:06d}".format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print("test poses shape", poses[i_test].shape)
