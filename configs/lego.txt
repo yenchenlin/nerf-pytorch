@@ -1,6 +1,6 @@
 expname = blender_paper_lego
 basedir = ./logs
-datadir = ./data/nerf_synthetic/lego
+datadir = /Users/mateuszrajski/Desktop/lego
 dataset_type = blender
 
 no_batching = True
@@ -10,7 +10,7 @@ white_bkgd = True
 lrate_decay = 500
 
 N_samples = 64
-N_importance = 128
+N_importance = 0
 N_rand = 1024
 
 precrop_iters = 500
