@@ -1,9 +1,12 @@
-torch==1.11.0
+# PyTorch
+--find-links https://download.pytorch.org/whl/torch_stable.html
+--find-links https://data.pyg.org/whl/torch-2.0.0+cu117.html
+torch==2.0.0+cu117
 torchvision>=0.9.1
-imageio
-imageio-ffmpeg
-matplotlib
-configargparse
-tensorboard>=2.0
-tqdm
-opencv-python
+imageio>=2.31.1
+imageio-ffmpeg>=0.4.8
+matplotlib>=3.7.2
+configargparse>=1.7
+tensorboard>=2.13.0
+tqdm>=4.65.0
+opencv-python>=4.8.0.74
