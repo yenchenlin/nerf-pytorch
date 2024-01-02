@@ -1,6 +1,10 @@
 expname = blender_paper_lego
 basedir = ./logs
+<<<<<<< Updated upstream
 datadir = /Users/mateuszrajski/Desktop/lego
+=======
+datadir = /net/tscratch/people/plgmateuuszzzzz/lego
+>>>>>>> Stashed changes
 dataset_type = blender
 
 no_batching = True
