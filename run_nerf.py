@@ -19,6 +19,7 @@ from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 from sampling_networks.baseline_sampling_network import BaselineSamplingNetwork
 
+print(f'device {"cuda" if torch.cuda.is_available() else "cpu"}')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
