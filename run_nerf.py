@@ -18,12 +18,18 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 from sampling_networks.baseline_sampling_network import BaselineSamplingNetwork
+from torch.utils.tensorboard import SummaryWriter
 
 print(f'device {"cuda" if torch.cuda.is_available() else "cpu"}')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
 
+def log_on_tensorboard(writer, step, metrics):
+    for i in metrics:
+        for j in metrics[i]:
+            writer.add_scalar(f"{i}/{j}", metrics[i][j], step)
+    writer.flush()
 
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches.
@@ -219,6 +225,12 @@ def create_nerf(args):
     basedir = args.basedir
     expname = args.expname
 
+    writer = None
+    if not args.render_only:
+        writer = SummaryWriter(
+            log_dir=f'{basedir}/metrics/{expname}'
+        )
+
     ##########################
 
     # Load checkpoints
@@ -254,6 +266,7 @@ def create_nerf(args):
         'white_bkgd' : args.white_bkgd,
         'raw_noise_std' : args.raw_noise_std,
         'sampling_network': sampling_network,
+        'writer': writer,
     }
 
     # NDC only good for LLFF-style forward facing data
@@ -651,6 +664,7 @@ def train():
 
     # Create nerf model
     render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_nerf(args)
+    writer = render_kwargs_train['writer']
     global_step = start
 
     bds_dict = {
@@ -780,6 +794,11 @@ def train():
         loss = img_loss
         psnr = mse2psnr(img_loss)
 
+        log_on_tensorboard(writer, i, {'train': {
+            'loss': loss,
+            'psnr': psnr,
+        }})
+
         if 'rgb0' in extras:
             img_loss0 = img2mse(extras['rgb0'], target_s)
             loss = loss + img_loss0
@@ -833,10 +852,18 @@ def train():
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
             with torch.no_grad():
-                render_path(torch.Tensor(poses[i_test]).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
+                target_s = images[i_test]
+                rgbs, _ = render_path(torch.Tensor(poses[i_test]).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
+                img_loss = img2mse(torch.Tensor(rgbs), torch.Tensor(target_s))
+                loss = img_loss
+                psnr = mse2psnr(img_loss)
+
+                log_on_tensorboard(writer, i, {'test': {
+                    'loss': loss,
+                    'psnr': psnr,
+                }})
+
             print('Saved test set')
-
-
     
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
