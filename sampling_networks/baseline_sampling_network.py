@@ -7,8 +7,8 @@ def scale_points_with_weights(z_vals: torch.Tensor, rays_o: torch.Tensor, rays_d
     # rays [N_rays, 3]
 
     # out: [N_rays, N_sampled, 3]
-
-    return rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
+    normalized_rays_d = F.normalize(rays_d)
+    return rays_o[..., None, :] + normalized_rays_d[..., None, :] * z_vals[..., :, None]
 
 class BaselineSamplingNetwork(nn.Module):
     def __init__(self, origin_channels = 3, direction_channels = 3, output_channels = 40, far = 6, near = 2):
