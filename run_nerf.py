@@ -17,12 +17,19 @@ from load_llff import load_llff_data
 from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
+from sampling_networks.baseline_sampling_network import BaselineSamplingNetwork
+from torch.utils.tensorboard import SummaryWriter
 
-
+print(f'device {"cuda" if torch.cuda.is_available() else "cpu"}')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
 
+def log_on_tensorboard(writer, step, metrics):
+    for i in metrics:
+        for j in metrics[i]:
+            writer.add_scalar(f"{i}/{j}", metrics[i][j], step)
+    writer.flush()
 
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches.
@@ -203,12 +210,26 @@ def create_nerf(args):
                                                                 embeddirs_fn=embeddirs_fn,
                                                                 netchunk=args.netchunk)
 
+
+    # Create sampling network 
+
+    sampling_network = BaselineSamplingNetwork(
+        output_channels=args.N_samples
+    )
+    grad_vars += list(sampling_network.parameters())
+
     # Create optimizer
     optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
 
     start = 0
     basedir = args.basedir
     expname = args.expname
+
+    writer = None
+    if not args.render_only:
+        writer = SummaryWriter(
+            log_dir=f'{basedir}/metrics/{expname}'
+        )
 
     ##########################
 
@@ -244,6 +265,8 @@ def create_nerf(args):
         'use_viewdirs' : args.use_viewdirs,
         'white_bkgd' : args.white_bkgd,
         'raw_noise_std' : args.raw_noise_std,
+        'sampling_network': sampling_network,
+        'writer': writer,
     }
 
     # NDC only good for LLFF-style forward facing data
@@ -308,6 +331,7 @@ def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=F
 def render_rays(ray_batch,
                 network_fn,
                 network_query_fn,
+                sampling_network: BaselineSamplingNetwork,
                 N_samples,
                 retraw=False,
                 lindisp=False,
@@ -317,7 +341,8 @@ def render_rays(ray_batch,
                 white_bkgd=False,
                 raw_noise_std=0.,
                 verbose=False,
-                pytest=False):
+                pytest=False,
+                writer=None):
     """Volumetric rendering.
     Args:
       ray_batch: array of shape [batch_size, ...]. All information necessary
@@ -351,65 +376,67 @@ def render_rays(ray_batch,
     N_rays = ray_batch.shape[0]
     rays_o, rays_d = ray_batch[:,0:3], ray_batch[:,3:6] # [N_rays, 3] each
     viewdirs = ray_batch[:,-3:] if ray_batch.shape[-1] > 8 else None
-    bounds = torch.reshape(ray_batch[...,6:8], [-1,1,2])
-    near, far = bounds[...,0], bounds[...,1] # [-1,1]
+    # bounds = torch.reshape(ray_batch[...,6:8], [-1,1,2])
+    # near, far = bounds[...,0], bounds[...,1] # [-1,1]
 
-    t_vals = torch.linspace(0., 1., steps=N_samples)
-    if not lindisp:
-        z_vals = near * (1.-t_vals) + far * (t_vals)
-    else:
-        z_vals = 1./(1./near * (1.-t_vals) + 1./far * (t_vals))
+    # t_vals = torch.linspace(0., 1., steps=N_samples)
+    # if not lindisp:
+    #     z_vals = near * (1.-t_vals) + far * (t_vals)
+    # else:
+    #     z_vals = 1./(1./near * (1.-t_vals) + 1./far * (t_vals))
 
-    z_vals = z_vals.expand([N_rays, N_samples])
+    # z_vals = z_vals.expand([N_rays, N_samples])
 
-    if perturb > 0.:
-        # get intervals between samples
-        mids = .5 * (z_vals[...,1:] + z_vals[...,:-1])
-        upper = torch.cat([mids, z_vals[...,-1:]], -1)
-        lower = torch.cat([z_vals[...,:1], mids], -1)
-        # stratified samples in those intervals
-        t_rand = torch.rand(z_vals.shape)
+    # if perturb > 0.:
+    #     # get intervals between samples
+    #     mids = .5 * (z_vals[...,1:] + z_vals[...,:-1])
+    #     upper = torch.cat([mids, z_vals[...,-1:]], -1)
+    #     lower = torch.cat([z_vals[...,:1], mids], -1)
+    #     # stratified samples in those intervals
+    #     t_rand = torch.rand(z_vals.shape)
 
-        # Pytest, overwrite u with numpy's fixed random numbers
-        if pytest:
-            np.random.seed(0)
-            t_rand = np.random.rand(*list(z_vals.shape))
-            t_rand = torch.Tensor(t_rand)
+    #     # Pytest, overwrite u with numpy's fixed random numbers
+    #     if pytest:
+    #         np.random.seed(0)
+    #         t_rand = np.random.rand(*list(z_vals.shape))
+    #         t_rand = torch.Tensor(t_rand)
 
-        z_vals = lower + (upper - lower) * t_rand
+    #     z_vals = lower + (upper - lower) * t_rand
 
-    pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
+    # pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
+    pts, z_vals = sampling_network.forward(rays_o, rays_d)
 
 
 #     raw = run_network(pts)
     raw = network_query_fn(pts, viewdirs, network_fn)
     rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest=pytest)
 
-    if N_importance > 0:
+      # We only need one network
+#     if N_importance > 0:
 
-        rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
+#         rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
 
-        z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
-        z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.), pytest=pytest)
-        z_samples = z_samples.detach()
+#         z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
+#         z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.), pytest=pytest)
+#         z_samples = z_samples.detach()
 
-        z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
-        pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
+#         z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
+#         pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
 
-        run_fn = network_fn if network_fine is None else network_fine
-#         raw = run_network(pts, fn=run_fn)
-        raw = network_query_fn(pts, viewdirs, run_fn)
+#         run_fn = network_fn if network_fine is None else network_fine
+# #         raw = run_network(pts, fn=run_fn)
+#         raw = network_query_fn(pts, viewdirs, run_fn)
 
-        rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest=pytest)
+#         rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest=pytest)
 
     ret = {'rgb_map' : rgb_map, 'disp_map' : disp_map, 'acc_map' : acc_map}
     if retraw:
         ret['raw'] = raw
-    if N_importance > 0:
-        ret['rgb0'] = rgb_map_0
-        ret['disp0'] = disp_map_0
-        ret['acc0'] = acc_map_0
-        ret['z_std'] = torch.std(z_samples, dim=-1, unbiased=False)  # [N_rays]
+    # if N_importance > 0:
+    #     ret['rgb0'] = rgb_map_0
+    #     ret['disp0'] = disp_map_0
+    #     ret['acc0'] = acc_map_0
+    #     ret['z_std'] = torch.std(z_samples, dim=-1, unbiased=False)  # [N_rays]
 
     for k in ret:
         if (torch.isnan(ret[k]).any() or torch.isinf(ret[k]).any()) and DEBUG:
@@ -638,6 +665,7 @@ def train():
 
     # Create nerf model
     render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_nerf(args)
+    writer = render_kwargs_train['writer']
     global_step = start
 
     bds_dict = {
@@ -767,6 +795,11 @@ def train():
         loss = img_loss
         psnr = mse2psnr(img_loss)
 
+        log_on_tensorboard(writer, i, {'train': {
+            'loss': loss,
+            'psnr': psnr,
+        }})
+
         if 'rgb0' in extras:
             img_loss0 = img2mse(extras['rgb0'], target_s)
             loss = loss + img_loss0
@@ -794,7 +827,7 @@ def train():
             torch.save({
                 'global_step': global_step,
                 'network_fn_state_dict': render_kwargs_train['network_fn'].state_dict(),
-                'network_fine_state_dict': render_kwargs_train['network_fine'].state_dict(),
+                'network_fine_state_dict': render_kwargs_train['network_fine'].state_dict() if render_kwargs_train.get('network_fine') is not None else None,
                 'optimizer_state_dict': optimizer.state_dict(),
             }, path)
             print('Saved checkpoints at', path)
@@ -820,10 +853,18 @@ def train():
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
             with torch.no_grad():
-                render_path(torch.Tensor(poses[i_test]).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
+                target_s = images[i_test]
+                rgbs, _ = render_path(torch.Tensor(poses[i_test]).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
+                img_loss = img2mse(torch.Tensor(rgbs), torch.Tensor(target_s))
+                loss = img_loss
+                psnr = mse2psnr(img_loss)
+
+                log_on_tensorboard(writer, i, {'test': {
+                    'loss': loss,
+                    'psnr': psnr,
+                }})
+
             print('Saved test set')
-
-
     
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
@@ -873,6 +914,6 @@ def train():
 
 
 if __name__=='__main__':
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
     train()
