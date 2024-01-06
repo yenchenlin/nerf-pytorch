@@ -1,6 +1,7 @@
 import torch
 from torch import nn as nn
 import torch.nn.functional as F
+from run_nerf_helpers import get_embedder
 
 def scale_points_with_weights(z_vals: torch.Tensor, rays_o: torch.Tensor, rays_d: torch.Tensor):
     # z_vals [N_rays, N_sampled]
@@ -21,10 +22,32 @@ class BaselineSamplingNetwork(nn.Module):
         self.far = far
         self.near = near
 
+        self.origin_embedder, self.origin_dims = get_embedder(multires=10)
+        self.direction_embedder, self.direction_dims = get_embedder(multires=10)
+
+        self.origin_layers = nn.ModuleList(
+            [
+                nn.Linear(self.origin_dims, self.w1),
+                nn.Linear(self.w1,self.w2),
+                nn.Linear(self.w2,self.w2),
+                nn.Linear(self.w2,self.w2),
+                nn.Linear(self.w2, self.w2),
+            ]
+        )
+
+        self.direction_layers = nn.ModuleList(
+            [
+                nn.Linear(self.origin_dims, self.w1),
+                nn.Linear(self.w1,self.w2),
+                nn.Linear(self.w2,self.w2),
+                nn.Linear(self.w2, self.w2),
+            ]
+        )
+
         self.layers = nn.ModuleList(
             [
-                nn.Linear(self.origin_channels+self.direction_channels, self.w1),
-                nn.Linear(self.w1,self.w2),
+                nn.Linear(self.w2 * 2, self.w2),
+                nn.Linear(self.w2,self.w2),
                 nn.Linear(self.w2, self.w2),
             ]
         )
@@ -33,10 +56,22 @@ class BaselineSamplingNetwork(nn.Module):
 
     def forward(self, rays_o: torch.Tensor, rays_d: torch.Tensor):
 
-        inputs = torch.cat([rays_o, rays_d], -1)
-        print(inputs.shape)
+        embedded_origin = self.origin_embedder(rays_o)
+        embedded_direction = self.direction_embedder(rays_d)
 
-        outputs = inputs
+        origin_outputs = embedded_origin
+        direction_outputs = embedded_direction
+
+        for layer in self.origin_layers:
+            origin_outputs = layer(origin_outputs)
+            origin_outputs = F.relu(origin_outputs)
+
+        for layer in self.direction_layers:
+            direction_outputs = layer(direction_outputs)
+            direction_outputs = F.relu(direction_outputs)
+
+        outputs = torch.cat([origin_outputs, direction_outputs], -1)
+
         for layer in self.layers:
             outputs = layer(outputs)
             outputs = F.relu(outputs)
