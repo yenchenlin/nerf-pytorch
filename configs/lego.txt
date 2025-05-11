@@ -7,13 +7,23 @@ no_batching = True
 
 use_viewdirs = True
 white_bkgd = True
-lrate_decay = 500
 
+# 保持渲染質量的關鍵參數
 N_samples = 64
 N_importance = 128
-N_rand = 1024
+multires = 10
+multires_views = 4
+netdepth = 8
+netwidth = 256
+
+# 優化速度的參數
+N_rand = 2048
+chunk = 32768
+netchunk = 65536
+
+# 學習率策略優化
+lrate = 1e-3
+lrate_decay = 250
 
 precrop_iters = 500
 precrop_frac = 0.5
-
-half_res = True

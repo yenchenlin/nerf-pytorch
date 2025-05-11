@@ -161,3 +161,194 @@ However, if you find this implementation or pre-trained models helpful, please c
   year={2020}
 }
 ```
+
+# NeRF C++ Implementation
+
+This is a C++ implementation of [NeRF](http://www.matthewtancik.com/nerf) (Neural Radiance Fields), a method that achieves state-of-the-art results for synthesizing novel views of complex scenes.
+
+## Dependencies
+
+You can install dependencies either through Conda or system package manager.
+
+### Using Conda (Recommended)
+
+1. Install Miniconda or Anaconda if you haven't already.
+
+2. Create and activate a new conda environment:
+```bash
+# Create new environment
+conda create -n nerf-cpp python=3.8
+conda activate nerf-cpp
+
+# Install dependencies
+conda install -c pytorch pytorch torchvision cudatoolkit=11.8
+conda install -c conda-forge opencv eigen nlohmann_json
+conda install -c conda-forge cmake ninja
+```
+
+3. Set environment variables for CMake:
+```bash
+export CMAKE_PREFIX_PATH=$CONDA_PREFIX
+export Torch_DIR=$CONDA_PREFIX/lib/python3.8/site-packages/torch/share/cmake/Torch
+```
+
+### Using System Package Manager (Alternative)
+
+#### Ubuntu/Debian
+
+```bash
+# Install system dependencies
+sudo apt-get update
+sudo apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    libopencv-dev \
+    libeigen3-dev \
+    nlohmann-json3-dev
+
+# Install LibTorch (PyTorch C++ API)
+wget https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.1.0%2Bcu118.zip
+unzip libtorch-cxx11-abi-shared-with-deps-2.1.0+cu118.zip
+sudo mv libtorch /usr/local/
+```
+
+#### macOS
+
+```bash
+# Install system dependencies using Homebrew
+brew install cmake opencv eigen nlohmann-json
+
+# Install LibTorch
+wget https://download.pytorch.org/libtorch/cpu/libtorch-macos-2.1.0.zip
+unzip libtorch-macos-2.1.0.zip
+sudo mv libtorch /usr/local/
+```
+
+## Building the Project
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/nerf-cpp.git
+cd nerf-cpp
+```
+
+2. Create a build directory and build the project:
+```bash
+mkdir build && cd build
+
+# If using Conda
+cmake -DCMAKE_PREFIX_PATH=$CONDA_PREFIX -DTorch_DIR=$CONDA_PREFIX/lib/python3.8/site-packages/torch/share/cmake/Torch ..
+
+# If using system packages
+cmake ..
+
+make -j$(nproc)
+```
+
+## Running the Project
+
+### Download Example Data
+
+First, download the example datasets:
+
+```bash
+bash download_example_data.sh
+```
+
+This will download the `lego` and `fern` datasets to the `data` directory.
+
+### Training
+
+To train a NeRF model on the lego dataset:
+
+```bash
+./nerf_train configs/lego.txt
+```
+
+The training process will:
+1. Load the dataset from `data/nerf_synthetic/lego`
+2. Train the model for 100,000 iterations
+3. Save checkpoints every 1,000 iterations
+4. Save the final model as `final_model.pt`
+
+### Configuration
+
+The configuration files in the `configs` directory control various aspects of training:
+
+- `expname`: Name of the experiment
+- `basedir`: Directory to save logs and checkpoints
+- `datadir`: Directory containing the dataset
+- `dataset_type`: Type of dataset ("blender" or "llff")
+- `N_samples`: Number of samples per ray
+- `N_importance`: Number of importance samples
+- `use_viewdirs`: Whether to use view-dependent effects
+- `white_bkgd`: Whether to use white background
+
+## Project Structure
+
+```
+nerf-cpp/
+├── CMakeLists.txt
+├── include/
+│   └── nerf/
+│       ├── model.hpp
+│       ├── renderer.hpp
+│       └── dataset.hpp
+├── src/
+│   ├── model.cpp
+│   ├── renderer.cpp
+│   └── dataset.cpp
+├── examples/
+│   └── train.cpp
+├── configs/
+│   ├── lego.txt
+│   └── fern.txt
+└── data/
+    ├── nerf_synthetic/
+    └── nerf_llff_data/
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **CUDA not found**
+   - Make sure you have CUDA installed
+   - If using Conda, make sure you installed the correct CUDA toolkit version
+   - Set `TORCH_CUDA_VERSION` in CMake if needed
+
+2. **OpenCV not found**
+   - If using Conda, make sure you activated the environment
+   - If using system packages, install OpenCV development packages
+   - Set `OpenCV_DIR` in CMake if needed
+
+3. **Eigen3 not found**
+   - If using Conda, make sure you activated the environment
+   - If using system packages, install Eigen3 development packages
+   - Set `EIGEN3_INCLUDE_DIR` in CMake if needed
+
+### Memory Usage
+
+The default configuration uses:
+- Batch size: 1024 rays
+- Samples per ray: 64
+- Network width: 256
+- Network depth: 8
+
+You can adjust these parameters in the configuration files to reduce memory usage if needed.
+
+## Citation
+
+If you find this implementation helpful, please consider citing:
+
+```bibtex
+@misc{mildenhall2020nerf,
+    title={NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis},
+    author={Ben Mildenhall and Pratul P. Srinivasan and Matthew Tancik and Jonathan T. Barron and Ravi Ramamoorthi and Ren Ng},
+    year={2020},
+    eprint={2003.08934},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+```
