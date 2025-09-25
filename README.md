@@ -1,3 +1,5 @@
+This is a fork created by Tail-19, aiming to make this repository work on M1 chip. The project has finished 🎉
+
 # NeRF-pytorch
 
 
