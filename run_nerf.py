@@ -34,7 +34,7 @@ def batchify(fn, chunk):
     return ret
 
 
-def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
+def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64, bf16=False):
     """Prepares inputs and applies network 'fn'.
     """
     inputs_flat = torch.reshape(inputs, [-1, inputs.shape[-1]])
@@ -46,7 +46,10 @@ def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
         embedded_dirs = embeddirs_fn(input_dirs_flat)
         embedded = torch.cat([embedded, embedded_dirs], -1)
 
-    outputs_flat = batchify(fn, netchunk)(embedded)
+    # bf16 only for the MLP; volume rendering stays in float32
+    with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=bf16):
+        outputs_flat = batchify(fn, netchunk)(embedded)
+    outputs_flat = outputs_flat.float()
     outputs = torch.reshape(outputs_flat, list(inputs.shape[:-1]) + [outputs_flat.shape[-1]])
     return outputs
 
@@ -201,7 +204,8 @@ def create_nerf(args):
     network_query_fn = lambda inputs, viewdirs, network_fn : run_network(inputs, viewdirs, network_fn,
                                                                 embed_fn=embed_fn,
                                                                 embeddirs_fn=embeddirs_fn,
-                                                                netchunk=args.netchunk)
+                                                                netchunk=args.netchunk,
+                                                                bf16=args.bf16)
 
     # Create optimizer
     optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
@@ -450,6 +454,8 @@ def config_parser():
                         help='number of rays processed in parallel, decrease if running out of memory')
     parser.add_argument("--netchunk", type=int, default=1024*64, 
                         help='number of pts sent through network in parallel, decrease if running out of memory')
+    parser.add_argument("--bf16", action='store_true',
+                        help='run the MLP in bfloat16 autocast on CUDA; volume rendering stays in float32')
     parser.add_argument("--no_batching", action='store_true', 
                         help='only take random rays from 1 image at a time')
     parser.add_argument("--no_reload", action='store_true', 
